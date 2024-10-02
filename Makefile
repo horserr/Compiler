@@ -60,31 +60,31 @@ BUILD_DIR = build
 
 # Ensure build directory exists
 $(BUILD_DIR):
-		@mkdir -p $(BUILD_DIR)
+	@mkdir -p $(BUILD_DIR)
 
-parser: $(BUILD_DIR) syntax $(filter-out $(LFO),$(OBJS))
-		$(CC) -o $(BUILD_DIR)/parser $(filter-out $(LFO),$(OBJS)) -lfl -ly
+parser: $(BUILD_DIR) syntax main.c
+	$(CC) -o $(BUILD_DIR)/parser main.c $(BUILD_DIR)/syntax.tab.c -lfl -ly
 
 syntax: $(BUILD_DIR) lexical syntax-c
-		$(CC) -c $(YFC) -o $(YFO)
+	$(CC) -c $(YFC) -o $(YFO)
 
 lexical: $(BUILD_DIR) $(LFILE)
-		$(FLEX) -o $(LFC) $(LFILE)
+	$(FLEX) -o $(LFC) $(LFILE)
 
 scanner: $(BUILD_DIR) $(LFC) main.c
-		$(CC) main.c $(LFC) -lfl -o $(BUILD_DIR)/scanner
+	$(CC) main.c $(LFC) -lfl -o $(BUILD_DIR)/scanner
 
 syntax-c: $(BUILD_DIR) $(YFILE)
-		$(BISON) -o $(YFC) -d -v $(YFILE)
+	$(BISON) -o $(YFC) -d -v $(YFILE)
 
 -include $(patsubst %.o, %.d, $(OBJS))
 
 # 定义的一些伪目标
 .PHONY: clean test
 test: $(BUILD_DIR)/parser
-		./$(BUILD_DIR)/parser ../test/test1.cmm
+	./$(BUILD_DIR)/parser ../test/test1.cmm
 clean:
-		rm -rf $(BUILD_DIR)
-		rm -f *~
+	rm -rf $(BUILD_DIR)
+	rm -f *~
 
 endif

@@ -1,5 +1,6 @@
 %{
 #include <stdio.h>
+#include "syntax.tab.h"
 %}
 %option yylineno
 letter      [a-zA-Z]
@@ -7,37 +8,39 @@ digit       [0-9]
 alnum       [0-9a-zA-Z]
 whitespace  [ \t\r\n]+
 %%
-";"     { printf("SEMI\n"); }
-","     { printf("COMMA\n"); }
-"="     { printf("ASSIGNOP\n"); }
-">"|"<"|">="|"<="|"=="|"!=" { printf("RELOP\n"); }
-"+"     { printf("PLUS\n"); }
-"-"     { printf("MINUS\n"); }
-"*"     { printf("STAR\n"); }
-"/"     { printf("DIV\n"); }
-"&&"    { printf("AND\n"); }
-"||"    { printf("OR\n"); }
-"."     { printf("DOT\n"); }
-"!"     { printf("NOT\n"); }
-"("     { printf("LP\n"); }
-")"     { printf("RP\n"); }
-"["     { printf("LB\n"); }
-"]"     { printf("RB\n"); }
-"{"     { printf("LC\n"); }
-"}"     { printf("RC\n"); }
-"int"|"float" { printf("TYPE\n"); }
-"struct" { printf("STRUCT\n"); }
-"return" { printf("RETURN\n"); }
-"if"    { printf("IF\n"); }
-"else"  { printf("ELSE\n"); }
-"while" { printf("WHILE\n"); }
+";"     { return SEMI; }
+","     { return COMMA; }
+"="     { return ASSIGNOP; }
+">"|"<"|">="|"<="|"=="|"!=" { return RELOP; }
+"+"     { return PLUS; }
+"-"     { return MINUS; }
+"*"     { return STAR; }
+"/"     { return DIV; }
+"&&"    { return AND; }
+"||"    { return OR; }
+"."     { return DOT; }
+"!"     { return NOT; }
+"("     { return LP; }
+")"     { return RP; }
+"["     { return LB; }
+"]"     { return RB; }
+"{"     { return LC; }
+"}"     { return RC; }
+"int"|"float" { return TYPE; }
+"struct" { return STRUCT; }
+"return" { return RETURN; }
+"if"    { return IF; }
+"else"  { return ELSE; }
+"while" { return WHILE; }
 
-
-(_|{letter})(_|{alnum})*   { printf("ID\n"); }
-{digit}+\.{digit}+         { printf("FLOAT\n"); }
-0|([1-9]{digit}*)          { printf("decimal INT\n"); }
-0[0-7]+                    { printf("octal INT\n"); }
-0[xX][0-9a-fA-F]+          { printf("hexadecimal INT\n"); }
+(_|{letter})(_|{alnum})*   { return ID; }
+{digit}+\.{digit}+         { return FLOAT; }
+0|([1-9]{digit}*)          {
+                        yylval.type_int = atoi(yytext);
+                        return INT;
+                    }
+0[0-7]+                    { return INT; }
+0[xX][0-9a-fA-F]+          { return INT; }
 
 {whitespace} { /* Ignore whitespace */ }
 
