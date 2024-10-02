@@ -1,15 +1,6 @@
 %{
   #include "lex.yy.c"
 
-  typedef struct YYLTYPE {
-    int first_line;
-    int first_column;
-    int last_line;
-    int last_column;
-  } YYLTYPE;
-
-  #define YYLTYPE_IS_DECLARED 1
-
   void yyerror(char* msg);
 %}
 
@@ -153,5 +144,5 @@ Args : Exp COMMA Args
 
 %%
 void yyerror(char* msg) {
-    fprintf(stdout, "error: %s\n", msg);
+    fprintf(stdout, "Error type B at Line %d: %s\n", yylineno, msg);
 }

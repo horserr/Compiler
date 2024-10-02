@@ -42,7 +42,7 @@ whitespace  [ \t\r\n]+
 0[0-7]+                    { return INT; }
 0[xX][0-9a-fA-F]+          { return INT; }
 
-{whitespace} { /* Ignore whitespace */ }
+{whitespace}  { /* Ignore whitespace */ }
 
 .       { printf("Error type A at Line %d: Mysterious characters \'%s\'\n", yylineno, yytext); }
 %%

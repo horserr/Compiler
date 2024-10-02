@@ -1,8 +1,18 @@
 #include <stdio.h>
 
-// Declare the external functions
+// Declare the external variables and functions
+extern int yylineno;
 extern void yyrestart(FILE *input_file);
 extern void yyparse();
+
+void rewind(FILE *f) {
+    if (!f) {
+        perror("file can't open {main.c rewind}.");
+        return;
+    }
+    yylineno = 1;
+    yyrestart(f);
+}
 
 int main(int argc, char **argv) {
     if (argc == 1) {
@@ -14,7 +24,7 @@ int main(int argc, char **argv) {
         perror(argv[1]);
         return 1;
     }
-    yyrestart(f);
+    rewind(f);
     yyparse();
 
     return 0;
