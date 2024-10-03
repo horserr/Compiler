@@ -45,81 +45,85 @@
 %%
 /* High-level Definitions */
 Program : ExtDefList
-    ;
+        | error
+        ;
 
 ExtDefList : /* empty */
-    | ExtDef ExtDefList
-    ;
+           | ExtDef ExtDefList
+           | error ExtDefList
+           ;
 
 ExtDef : Specifier ExtDecList SEMI
-    | Specifier SEMI
-    | Specifier FunDec CompSt
-    ;
+       | Specifier SEMI
+       | Specifier FunDec CompSt
+       ;
 
 ExtDecList : VarDec
-    | VarDec COMMA ExtDecList
-    ;
+           | VarDec COMMA ExtDecList
+           ;
 
 /* Specifiers */
 Specifier : TYPE
-    | StructSpecifier
-    ;
+          | StructSpecifier
+          ;
 
 StructSpecifier : STRUCT OptTag LC DefList RC
-    | STRUCT Tag
-    ;
+                | STRUCT Tag
+                ;
 
 OptTag : /* empty */
-    | ID
-    ;
+       | ID
+       ;
 
 Tag : ID
     ;
 
 /* Declarators */
 VarDec : ID
-    | VarDec LB INT RB
-    ;
+       | VarDec LB INT RB
+       ;
 
 FunDec : ID LP VarList RP
-    | ID LP RP
-    ;
+       | ID LP RP
+       ;
 
 VarList : ParamDec COMMA VarList
-    | ParamDec
-    ;
+        | ParamDec
+        ;
 
 ParamDec : Specifier VarDec
-    ;
+         ;
 
 /* Statements */
 /* variables can only be declared at the beginning of CompSt */
 CompSt : LC DefList StmtList RC
-    ;
+       ;
 
 StmtList : /* empty */
-    | Stmt StmtList
-    ;
+         | Stmt StmtList
+         | error StmtList
+         ;
 
 Stmt : Exp SEMI
-    | CompSt
-    | RETURN Exp SEMI
-    | IF LP Exp RP Stmt %prec INFERIOR_ELSE
-    | IF LP Exp RP Stmt ELSE Stmt
-    | WHILE LP Exp RP Stmt
-    ;
+     | CompSt
+     | RETURN Exp SEMI
+     | IF LP Exp RP Stmt %prec INFERIOR_ELSE
+     | IF LP Exp RP Stmt ELSE Stmt
+     | WHILE LP Exp RP Stmt
+     ;
 
 /* Local Definitions */
 DefList : /* empty */
-    | Def DefList
-    ;
+        | Def DefList
+        | error DefList
+        ;
 
 Def : Specifier DecList SEMI
     ;
 
 DecList : Dec
-    | Dec COMMA DecList
-    ;
+        | Dec COMMA DecList
+        ;
 
 Dec : VarDec
     | VarDec ASSIGNOP Exp
@@ -144,12 +148,12 @@ Exp : Exp ASSIGNOP Exp
     | ID
     | INT
     | FLOAT
+    | error
     ;
 
 Args : Exp COMMA Args
-    | Exp
-    ;
-
+     | Exp
+     ;
 
 %%
 void yyerror(char* msg) {
