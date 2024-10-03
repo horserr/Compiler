@@ -12,8 +12,6 @@
 }
 
 /* declared tokens */
-/* %token <type_int> INT
-%token <type_float> FLOAT */
 %token <type_int> INT
 %token <type_float> FLOAT
 
@@ -26,11 +24,16 @@
 %token TYPE STRUCT RETURN IF ELSE WHILE ID
 
 /* declared operators and precedence */
-/* %token ADD SUB MUL DIV
-%right ASSIGN
-%left ADD SUB
-%left MUL DIV
-%left LP RP */
+%right      ASSIGNOP
+%left       OR
+%left       AND
+%left       RELOP
+%left       PLUS MINUS
+%left       STAR DIV
+%right      NOT UMINUS        /* unary minus (negation) */
+%left       LP RP LB RB DOT
+%nonassoc   INFERIOR_ELSE
+%nonassoc   ELSE
 
 /* declared non-terminals */
 /* %type <type_int> Exp Factor Term */
@@ -85,6 +88,7 @@ ParamDec : Specifier VarDec
     ;
 
 /* Statements */
+/* variables can only be declared at the beginning of CompSt */
 CompSt : LC DefList StmtList RC
     ;
 
@@ -95,7 +99,7 @@ StmtList : /* empty */
 Stmt : Exp SEMI
     | CompSt
     | RETURN Exp SEMI
-    | IF LP Exp RP Stmt
+    | IF LP Exp RP Stmt %prec INFERIOR_ELSE
     | IF LP Exp RP Stmt ELSE Stmt
     | WHILE LP Exp RP Stmt
     ;
@@ -126,7 +130,7 @@ Exp : Exp ASSIGNOP Exp
     | Exp STAR Exp
     | Exp DIV Exp
     | LP Exp RP
-    | MINUS Exp
+    | MINUS Exp %prec UMINUS  // unary minus
     | NOT Exp
     | ID LP Args RP
     | ID LP RP
