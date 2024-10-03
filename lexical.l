@@ -1,5 +1,6 @@
 %{
 #include <stdio.h>
+#include <stdlib.h>
 #include "syntax.tab.h"
 %}
 
@@ -37,14 +38,21 @@ whitespace  [ \t\r\n]+
 
 (_|{letter})(_|{alnum})*   { return ID; }
 {digit}+\.{digit}+         { return FLOAT; }
-0|([1-9]{digit}*)          {
-                        yylval.type_int = atoi(yytext);
-                        return INT;
-                    }
-0[0-7]+                    { return INT; }
-0[xX][0-9a-fA-F]+          { return INT; }
+
+0|([1-9]{digit}*) {
+                yylval.type_int = atoi(yytext);
+                return INT;
+              }
+0[0-7]+ {
+      yylval.type_int = strtol(yytext, NULL, 8);
+      return INT;
+    }
+0[xX][0-9a-fA-F]+ {
+                yylval.type_int = strtol(yytext, NULL, 16);
+                return INT;
+              }
 
 {whitespace}  { /* Ignore whitespace */ }
 
-.       { printf("Error type A at Line %d: Mysterious characters \'%s\'\n", yylineno, yytext); }
+.       { printf("Error type A at Line %d: Mysterious characters \'%s\'.\n", yylineno, yytext); }
 %%
