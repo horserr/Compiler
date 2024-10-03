@@ -1,5 +1,9 @@
 #include <stdio.h>
 
+#ifdef DEBUG
+extern int yydebug;
+#endif
+
 // Declare the external variables and functions
 extern int yylineno;
 extern void yyrestart(FILE *input_file);
@@ -14,9 +18,16 @@ void rewind(FILE *f) {
     yyrestart(f);
 }
 
+void parse() {
+#ifdef DEBUG
+    yydebug = 1;
+#endif
+    yyparse();
+}
+
 int main(int argc, char **argv) {
     if (argc == 1) {
-        yyparse();
+        parse();
         return 0;
     }
     FILE *f = fopen(argv[1], "r");
@@ -25,7 +36,7 @@ int main(int argc, char **argv) {
         return 1;
     }
     rewind(f);
-    yyparse();
+    parse();
 
     return 0;
 }

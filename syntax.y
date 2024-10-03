@@ -2,6 +2,11 @@
   #include "lex.yy.c"
 
   void yyerror(char* msg);
+
+  #ifdef DEBUG
+    #undef  YYDEBUG
+    #define YYDEBUG 1
+  #endif
 %}
 
 /* declared types */

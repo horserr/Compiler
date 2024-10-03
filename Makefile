@@ -65,6 +65,9 @@ $(BUILD_DIR):
 parser: $(BUILD_DIR) syntax main.c
 	$(CC) -o $(BUILD_DIR)/parser main.c $(BUILD_DIR)/syntax.tab.c -lfl -ly
 
+parser_debug: $(BUILD_DIR) syntax main.c
+	$(CC) -DDEBUG -o $(BUILD_DIR)/parser main.c $(BUILD_DIR)/syntax.tab.c -lfl -ly
+
 syntax: $(BUILD_DIR) lexical syntax-c
 	$(CC) -c $(YFC) -o $(YFO)
 
@@ -75,6 +78,9 @@ scanner: $(BUILD_DIR) $(LFC) main.c
 	$(CC) main.c $(LFC) -lfl -o $(BUILD_DIR)/scanner
 
 syntax-c: $(BUILD_DIR) $(YFILE)
+	$(BISON) -o $(YFC) -d $(YFILE)
+
+syntax-output: $(BUILD_DIR) $(YFILE)
 	$(BISON) -o $(YFC) -d -v $(YFILE)
 
 -include $(patsubst %.o, %.d, $(OBJS))

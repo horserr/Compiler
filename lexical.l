@@ -2,11 +2,13 @@
 #include <stdio.h>
 #include "syntax.tab.h"
 %}
+
 %option yylineno
 letter      [a-zA-Z]
 digit       [0-9]
 alnum       [0-9a-zA-Z]
 whitespace  [ \t\r\n]+
+
 %%
 ";"     { return SEMI; }
 ","     { return COMMA; }
