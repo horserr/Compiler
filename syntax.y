@@ -157,5 +157,5 @@ Args : Exp COMMA Args
 
 %%
 void yyerror(char* msg) {
-    fprintf(stdout, "Error type B at Line %d: %s\n", yylineno, msg);
+    fprintf(stdout, "Error type B at Line %d: %s around \"%s\".\n", yylineno, msg, yytext);
 }
