@@ -1,6 +1,5 @@
 %{
   #include "lex.yy.c"
-  #include "../AST.h"
 
   void yyerror(char* msg);
 
@@ -17,6 +16,10 @@
 /* declared types */
 %union {
   ASTNode* node;
+}
+
+%code requires{
+  #include "AST.h"
 }
 
 /* declared tokens */
@@ -51,9 +54,6 @@ Program : ExtDefList {
             root = createASTNode("Program", yylineno, 0);
             addChild(root, $1);
         }
-        | error {
-            $$ = createASTNode("Program", yylineno, 0);
-        }
         ;
 
 ExtDefList : /* empty */ {
@@ -63,9 +63,6 @@ ExtDefList : /* empty */ {
                 $$ = createASTNode("ExtDefList", yylineno, 0);
                 addChild($$, $1);
                 addChild($$, $2);
-            }
-           | error ExtDefList {
-                $$ = createASTNode("ExtDefList", yylineno, 0);
             }
            ;
 
@@ -208,9 +205,6 @@ StmtList : /* empty */ {
             addChild($$, $1);
             addChild($$, $2);
         }
-         | error StmtList {
-            $$ = createASTNode("StmtList", yylineno, 0);
-        }
          ;
 
 Stmt : Exp SEMI {
@@ -264,9 +258,6 @@ DefList : /* empty */ {
             $$ = createASTNode("DefList", yylineno, 0);
             addChild($$, $1);
             addChild($$, $2);
-        }
-        | error DefList {
-            $$ = createASTNode("DefList", yylineno, 0);
         }
         ;
 
@@ -404,9 +395,6 @@ Exp : Exp ASSIGNOP Exp {
     | FLOAT {
             $$ = createASTNode("Exp", yylineno, 0);
             addChild($$, $1);
-        }
-    | error {
-            $$ = createASTNode("Exp", yylineno, 0);
         }
     ;
 

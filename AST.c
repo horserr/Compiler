@@ -8,13 +8,30 @@
 // the definition of root.
 ASTNode *root = NULL;
 
+// Function to duplicate a string
+char *my_strdup(const char *src) {
+    if (src == NULL) {
+        return NULL;
+    }
+    // Allocate memory for the new string
+    char *dest = (char *)malloc(strlen(src) + 1);
+    if (dest == NULL) {
+        perror("fail to allocate memory in {my_strdup}.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the contents of the source string to the destination string
+    strcpy(dest, src);
+    return dest;
+}
+
 // Array List functions
 static int initArrayList(ArrayList *list) {
     list->capacity = 4;
     list->num = 0;
     list->container = (ASTNode **) malloc(list->capacity * sizeof(ASTNode *));
     if (list->container == NULL) {
-        perror("fail to init array list in {AST.c initArrayList}.\n");
+        perror("fail to initialize array list in {AST.c initArrayList}.\n");
         exit(EXIT_FAILURE);
     }
     return 0;
@@ -22,8 +39,7 @@ static int initArrayList(ArrayList *list) {
 
 static int resizeArrayList(ArrayList *list) {
     list->capacity *= 2;
-    list->container =
-            (ASTNode **) realloc(list->container, list->capacity * sizeof(ASTNode *));
+    list->container = (ASTNode **) realloc(list->container, list->capacity * sizeof(ASTNode *));
     if (list->container == NULL) {
         perror("fail to resize array list in {AST.c resizeArrayList}.\n");
         exit(EXIT_FAILURE);
@@ -33,7 +49,7 @@ static int resizeArrayList(ArrayList *list) {
 
 static void addToArrayList(ArrayList *list, ASTNode *node) {
     if (list == NULL) {
-        perror("node added is null in {AST.c addToArrayList}.\n");
+        perror("list is NULL in {AST.c addToArrayList}.\n");
         exit(EXIT_FAILURE);
     }
     if (list->num >= list->capacity * THRESHOLD) {
@@ -58,13 +74,13 @@ static void freeArrayList(const ArrayList *list) {
 ASTNode *createASTNode(const char *name, const int lineNum, const int flag) {
     ASTNode *node = (ASTNode *) malloc(sizeof(ASTNode));
     if (node == NULL) {
-        fprintf(stderr, "Failed to allocate memory for ASTNode\n");
+        perror("fail to allocate memory for AST node in {AST.c createASTNode}.\n");
         exit(EXIT_FAILURE);
     }
     node->flag = flag;
-    node->name = strdup(name);
+    node->name = my_strdup(name);
     if (node->name == NULL) {
-        perror("failed to allocate memory for node name in {AST.c createASTNode).");
+        perror("fail to duplicate string for AST node name in {AST.c createASTNode}.\n");
         free(node);
         exit(EXIT_FAILURE);
     }
@@ -76,7 +92,7 @@ ASTNode *createASTNode(const char *name, const int lineNum, const int flag) {
 // Function to copy ValueUnion
 static void copyValueUnion(ValueUnion *dest, const ValueUnion *src, const char *type) {
     if (strcmp(type, "id") == 0) {
-        dest->identifier = strdup(src->identifier);
+        dest->identifier = my_strdup(src->identifier);
     } else if (strcmp(type, "int") == 0) {
         dest->int_value = src->int_value;
     } else if (strcmp(type, "float") == 0) {
