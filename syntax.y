@@ -13,17 +13,15 @@
   extern ASTNode *root; // Root of the AST
 %}
 
-/* declared types */
-%union {
-  ASTNode* node;
-}
+%define api.value.type {ASTNode*}
 
 %code requires{
   #include "AST.h"
 }
 
 /* declared tokens */
-%token <node> INT FLOAT TYPE ID
+/* %token <node> INT FLOAT TYPE ID */
+%token INT FLOAT TYPE ID
 
 %token SEMI COMMA ASSIGNOP
 %token RELOP DOT
@@ -44,9 +42,6 @@
 %left       LP RP LB RB DOT
 %nonassoc   INFERIOR_ELSE
 %nonassoc   ELSE
-
-/* declared non-terminals */
-%type <node> Program ExtDefList ExtDef Specifier ExtDecList VarDec FunDec CompSt StmtList Stmt DefList Def DecList Dec Exp Args StructSpecifier OptTag Tag VarList ParamDec
 
 %%
 /* High-level Definitions */
