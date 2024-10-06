@@ -2,13 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "syntax.tab.h"
+
+int yycolumn = 1;
+#define YY_USER_ACTION \
+    yylloc.first_line = yylloc.last_line = yylineno; \
+    yylloc.first_column = yycolumn; \
+    yylloc.last_column = yycolumn + yyleng - 1; \
+    yycolumn += yyleng;
 %}
 
 %option yylineno
 letter      [a-zA-Z]
 digit       [0-9]
 alnum       [0-9a-zA-Z]
-whitespace  [ \t\r\n]+
+whitespace  [ \t\r]+
 
 %%
 ";"     { return SEMI; }
@@ -66,6 +73,7 @@ whitespace  [ \t\r\n]+
   return INT;
 }
 
+\n    { yycolumn = 1; }
 {whitespace}  { /* Ignore whitespace */ }
 
 .       { printf("Error type A at Line %d: Mysterious characters \'%s\'.\n", yylineno, yytext); }
