@@ -5,27 +5,8 @@
 
 #define THRESHOLD 0.75
 
-typedef struct {
-    int capacity, num;
-    ASTNode **container; // meant to be a list of pointer
-} ArrayList;
-
-union ValueUnion {
-    char *identifier; // id
-    int int_value;
-    float float_value;
-};
-
-struct ASTNode {
-    int flag; // 1: is token; 0: is higher expression
-    char *name;
-    int lineNum;
-    ArrayList children;
-    ValueUnion value;
-};
-
 // the definition of root.
-ASTNode *root;
+ASTNode *root = NULL;
 
 // Array List functions
 static int initArrayList(ArrayList *list) {
@@ -175,8 +156,13 @@ void printAST(const ASTNode *root) {
     }
     print(root, 0);
 }
+
 void printASTRoot() {
     printAST(root);
+}
+
+void cleanAST() {
+    freeASTNode(root);
 }
 
 //////test code/////////////////////////////////////////////
@@ -198,7 +184,7 @@ int main(int argc, char const *argv[]) {
     ASTNode *int_child = createASTNodeWithValue("INT", 6, value);
 
     ValueUnion value1 = {.identifier = "hello, wo!"};
-    ASTNode *id_child = createASTNodeWithValue("ID",7,value1);
+    ASTNode *id_child = createASTNodeWithValue("ID", 7, value1);
 
     ValueUnion value3 = {.float_value = 3.01};
     ASTNode *float_child = createASTNodeWithValue("FLOAT", 8, value3);
@@ -206,10 +192,10 @@ int main(int argc, char const *argv[]) {
     ValueUnion value4 = {.identifier = "int"};
     ASTNode *type_child = createASTNodeWithValue("TYPE", 9, value4);
 
-    addChild(child4,int_child);
-    addChild(child4,id_child);
-    addChild(child2,float_child);
-    addChild(child2,type_child);
+    addChild(child4, int_child);
+    addChild(child4, id_child);
+    addChild(child2, float_child);
+    addChild(child2, type_child);
 
     printf("Test 1: Simple AST\n");
     printAST(root);

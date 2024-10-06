@@ -29,28 +29,42 @@ whitespace  [ \t\r\n]+
 "]"     { return RB; }
 "{"     { return LC; }
 "}"     { return RC; }
-"int"|"float" { return TYPE; }
 "struct" { return STRUCT; }
 "return" { return RETURN; }
 "if"    { return IF; }
 "else"  { return ELSE; }
 "while" { return WHILE; }
 
-(_|{letter})(_|{alnum})*   { return ID; }
-{digit}+\.{digit}+         { return FLOAT; }
-
+"int"|"float" {
+  ValueUnion value = {.identifier = yytext};
+  yylval.node = createASTNodeWithValue("TYPE", yylineno, value);
+  return TYPE;
+}
+(_|{letter})(_|{alnum})*  {
+  ValueUnion value = {.identifier = yytext};
+  yylval.node = createASTNodeWithValue("ID", yylineno, value);
+  return ID;
+}
+{digit}+\.{digit}+  {
+  ValueUnion value = {.float_value = strtof(yytext, NULL)};
+  yylval.node = createASTNodeWithValue("FLOAT", yylineno, value);
+  return FLOAT;
+}
 0|([1-9]{digit}*) {
-                yylval.type_int = atoi(yytext);
-                return INT;
-              }
+  ValueUnion value = {.int_value = atoi(yytext)};
+  yylval.node = createASTNodeWithValue("INT", yylineno, value);
+  return INT;
+}
 0[0-7]+ {
-      yylval.type_int = strtol(yytext, NULL, 8);
-      return INT;
-    }
+  ValueUnion value = {.int_value = strtol(yytext, NULL, 8)};
+  yylval.node = createASTNodeWithValue("INT", yylineno, value);
+  return INT;
+}
 0[xX][0-9a-fA-F]+ {
-                yylval.type_int = strtol(yytext, NULL, 16);
-                return INT;
-              }
+  ValueUnion value = {.int_value = strtol(yytext, NULL, 16)};
+  yylval.node = createASTNodeWithValue("INT", yylineno, value);
+  return INT;
+}
 
 {whitespace}  { /* Ignore whitespace */ }
 

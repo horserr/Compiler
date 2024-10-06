@@ -65,23 +65,23 @@ $(BUILD_DIR):
 parser: $(BUILD_DIR) syntax main.c
 	$(CC) -o $(BUILD_DIR)/parser main.c $(BUILD_DIR)/syntax.tab.c -lfl -ly
 
-parser_debug: $(BUILD_DIR) syntax main.c
+parser_debug: $(BUILD_DIR) syntax-output main.c
 	$(CC) -DDEBUG -o $(BUILD_DIR)/parser main.c $(BUILD_DIR)/syntax.tab.c -lfl -ly
 
 syntax: $(BUILD_DIR) lexical syntax-c
-	$(CC) -c $(YFC) -o $(YFO)
+	$(CC) -c $(BUILD_DIR)/syntax.tab.c -o $(BUILD_DIR)/syntax.tab.o
 
 lexical: $(BUILD_DIR) $(LFILE)
-	$(FLEX) -o $(LFC) $(LFILE)
+	$(FLEX) -o $(BUILD_DIR)/lex.yy.c $(LFILE)
 
-scanner: $(BUILD_DIR) $(LFC) main.c
-	$(CC) main.c $(LFC) -lfl -o $(BUILD_DIR)/scanner
+scanner: $(BUILD_DIR) $(BUILD_DIR)/lex.yy.c main.c
+	$(CC) main.c $(BUILD_DIR)/lex.yy.c -lfl -o $(BUILD_DIR)/scanner
 
 syntax-c: $(BUILD_DIR) $(YFILE)
-	$(BISON) -o $(YFC) -d $(YFILE)
+	$(BISON) -o $(BUILD_DIR)/syntax.tab.c -d $(YFILE)
 
 syntax-output: $(BUILD_DIR) $(YFILE)
-	$(BISON) -o $(YFC) -d -v $(YFILE)
+	$(BISON) -o $(BUILD_DIR)/syntax.tab.c -d -v $(YFILE)
 
 -include $(patsubst %.o, %.d, $(OBJS))
 

@@ -1,3 +1,4 @@
+#include "AST.h"
 #include <stdio.h>
 
 #ifdef DEBUG
@@ -7,7 +8,7 @@ extern int yydebug;
 // Declare the external variables and functions
 extern int yylineno;
 extern void yyrestart(FILE *input_file);
-extern void yyparse();
+extern int yyparse();
 
 void rewind(FILE *f) {
     if (!f) {
@@ -18,11 +19,11 @@ void rewind(FILE *f) {
     yyrestart(f);
 }
 
-void parse() {
+int parse() {
 #ifdef DEBUG
     yydebug = 1;
 #endif
-    yyparse();
+    return yyparse();
 }
 
 int main(int argc, char **argv) {
@@ -36,7 +37,12 @@ int main(int argc, char **argv) {
         return 1;
     }
     rewind(f);
-    parse();
+    int rst = parse();
+    if (rst == 0) {
+        // print and free
+        printASTRoot();
+        cleanAST();
+    }
 
     return 0;
 }
