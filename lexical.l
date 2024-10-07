@@ -9,6 +9,8 @@ int yycolumn = 1;
     yylloc.first_column = yycolumn; \
     yylloc.last_column = yycolumn + yyleng - 1; \
     yycolumn += yyleng;
+
+extern int hasError;
 %}
 
 %option yylineno
@@ -76,5 +78,8 @@ whitespace  [ \t\r]+
 \n    { yycolumn = 1; }
 {whitespace}  { /* Ignore whitespace */ }
 
-.       { printf("Error type A at Line %d: Mysterious characters \'%s\'.\n", yylineno, yytext); }
+.       {
+  hasError = 1;
+  printf("Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext);
+}
 %%

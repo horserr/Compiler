@@ -8,7 +8,9 @@ extern int yydebug;
 // Declare the external variables and functions
 extern int yylineno;
 extern void yyrestart(FILE *input_file);
-extern int yyparse();
+extern void yyparse();
+
+int hasError = 0;
 
 void rewind(FILE *f) {
     if (!f) {
@@ -19,11 +21,11 @@ void rewind(FILE *f) {
     yyrestart(f);
 }
 
-int parse() {
+void parse() {
 #ifdef DEBUG
     yydebug = 1;
 #endif
-    return yyparse();
+    yyparse();
 }
 
 int main(int argc, char **argv) {
@@ -37,8 +39,8 @@ int main(int argc, char **argv) {
         return 1;
     }
     rewind(f);
-    int rst = parse();
-    if (rst == 0) {
+    parse();
+    if (hasError == 0) {
         // print and free
         printASTRoot();
         cleanAST();

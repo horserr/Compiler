@@ -8,6 +8,7 @@
 
   void yyerror(char* msg);
   extern ASTNode *root; // Root of the AST
+  extern int hasError;
 %}
 
 %define api.value.type {ASTNode*}
@@ -56,6 +57,7 @@ ExtDefList : /* empty */ {
                 addChild($$, $1);
                 addChild($$, $2);
             }
+           | error ExtDefList
            ;
 
 ExtDef : Specifier ExtDecList SEMI {
@@ -75,6 +77,12 @@ ExtDef : Specifier ExtDecList SEMI {
             addChild($$, $2);
             addChild($$, $3);
         }
+       | error ExtDecList SEMI
+       | Specifier ExtDecList error SEMI
+       | error SEMI
+       | error FunDec CompSt
+       | Specifier error CompSt
+       | Specifier FunDec error
        ;
 
 ExtDecList : VarDec {
@@ -87,6 +95,7 @@ ExtDecList : VarDec {
                 addChild($$, createASTNode("COMMA", @2.first_line, 1));
                 addChild($$, $3);
             }
+           | error COMMA ExtDecList
            ;
 
 /* Specifiers */
@@ -113,15 +122,18 @@ StructSpecifier : STRUCT OptTag LC DefList RC {
                     addChild($$, createASTNode("STRUCT", @1.first_line, 1));
                     addChild($$, $2);
                 }
+                | STRUCT error LC DefList RC
+                | STRUCT OptTag LC error RC
+                | STRUCT error
                 ;
 
 OptTag : /* empty */ {
             $$ = createASTNode("OptTag", @$.first_line, 0);
-        }
+       }
        | ID {
             $$ = createASTNode("OptTag", @$.first_line, 0);
             addChild($$, $1);
-        }
+       }
        ;
 
 Tag : ID {
@@ -134,14 +146,16 @@ Tag : ID {
 VarDec : ID {
             $$ = createASTNode("VarDec", @$.first_line, 0);
             addChild($$, $1);
-        }
+       }
        | VarDec LB INT RB {
             $$ = createASTNode("VarDec", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, createASTNode("LB", @2.first_line, 1));
             addChild($$, $3);
             addChild($$, createASTNode("RB", @4.first_line, 1));
-        }
+       }
+       | VarDec LB error RB
+       | error LB INT RB
        ;
 
 FunDec : ID LP VarList RP {
@@ -156,7 +170,10 @@ FunDec : ID LP VarList RP {
             addChild($$, $1);
             addChild($$, createASTNode("LP", @2.first_line, 1));
             addChild($$, createASTNode("RP", @3.first_line, 1));
-        }
+       }
+       | error LP VarList RP
+       | ID LP error RP
+       | error LP RP
        ;
 
 VarList : ParamDec COMMA VarList {
@@ -164,19 +181,23 @@ VarList : ParamDec COMMA VarList {
             addChild($$, $1);
             addChild($$, createASTNode("COMMA", @2.first_line, 1));
             addChild($$, $3);
-     }
+        }
         | ParamDec {
             $$ = createASTNode("VarList", @$.first_line, 0);
             addChild($$, $1);
         }
+        | error COMMA VarList
+        | ParamDec COMMA error
         ;
 
 ParamDec : Specifier VarDec {
             $$ = createASTNode("ParamDec", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
-        }
-        ;
+         }
+         | error VarDec
+         | Specifier error
+         ;
 
 /* Statements */
 /* variables can only be declared at the beginning of CompSt */
@@ -186,17 +207,18 @@ CompSt : LC DefList StmtList RC {
             addChild($$, $2);
             addChild($$, $3);
             addChild($$, createASTNode("RC", @4.first_line, 1));
-        }
+       }
+       | LC DefList error RC
        ;
 
 StmtList : /* empty */ {
             $$ = createASTNode("StmtList", @$.first_line, 0);
-        }
+         }
          | Stmt StmtList {
             $$ = createASTNode("StmtList", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
-        }
+         }
          ;
 
 Stmt : Exp SEMI {
@@ -240,6 +262,15 @@ Stmt : Exp SEMI {
             addChild($$, createASTNode("RP", @4.first_line, 1));
             addChild($$, $5);
         }
+       | error SEMI
+       | RETURN error SEMI
+       | IF LP error RP Stmt %prec INFERIOR_ELSE
+       | IF LP Exp RP error %prec INFERIOR_ELSE
+       | IF LP error RP Stmt ELSE Stmt
+       | IF LP Exp RP error ELSE Stmt
+       | IF LP Exp RP Stmt ELSE error
+       | WHILE LP error RP Stmt
+       | WHILE LP Exp RP error
      ;
 
 /* Local Definitions */
@@ -258,7 +289,7 @@ Def : Specifier DecList SEMI {
             addChild($$, $1);
             addChild($$, $2);
             addChild($$, createASTNode("SEMI", @3.first_line, 1));
-        }
+    }
     ;
 
 DecList : Dec {
@@ -271,6 +302,7 @@ DecList : Dec {
             addChild($$, createASTNode("COMMA", @2.first_line, 1));
             addChild($$, $3);
         }
+        | error COMMA DecList
         ;
 
 Dec : VarDec {
@@ -283,6 +315,7 @@ Dec : VarDec {
             addChild($$, createASTNode("ASSIGNOP", @2.first_line, 1));
             addChild($$, $3);
         }
+    | VarDec ASSIGNOP error
     ;
 
 /* Expressions */
@@ -404,5 +437,6 @@ Args : Exp COMMA Args {
 
 %%
 void yyerror(char* msg) {
+    hasError = 1;
     fprintf(stdout, "Error type B at Line %d: %s around \"%s\".\n", yylineno, msg, yytext);
 }
