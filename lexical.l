@@ -9,8 +9,6 @@ int yycolumn = 1;
     yylloc.first_column = yycolumn; \
     yylloc.last_column = yycolumn + yyleng - 1; \
     yycolumn += yyleng;
-
-extern int hasError;
 %}
 
 %option yylineno
@@ -74,22 +72,9 @@ whitespace  [ \t\r]+
   yylval = createASTNodeWithValue("INT", yylineno, value);
   return INT;
 }
-0[0-9]+  {
-  hasError = 1;
-  printf("Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext);
-  return INT;
-}
-0[xX]{alnum}+ {
-  hasError = 1;
-  printf("Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext);
-  return INT;
-}
 
 \n    { yycolumn = 1; }
 {whitespace}  { /* Ignore whitespace */ }
 
-.       {
-  hasError = 1;
-  printf("Error type A at Line %d: Mysterious characters \"%s\".\n", yylineno, yytext);
-}
+.       { printf("Error type A at Line %d: Mysterious characters \'%s\'.\n", yylineno, yytext); }
 %%
