@@ -2,11 +2,12 @@ cmake_minimum_required(VERSION 3.20)
 project(Compiler LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 
-option(AST_TEST "test AST date structure" OFF)
+option(PARSE_TREE_TEST "test PARSE TREE date structure" OFF)
 option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF)
+option(SYMBOL_TEST "test symbol table" ON)
 ADD_COMPILE_DEFINITIONS("LOCAL")
 
-add_subdirectory(AST)
+add_subdirectory(ParseTree)
 add_subdirectory(SymbolTable)
 
 find_package(FLEX 2.6.4 REQUIRED)
@@ -32,14 +33,9 @@ add_executable(${PROJECT_NAME}
         ${FLEX_Lexer_OUTPUTS}
         ${BISON_Parser_OUTPUTS}
 )
-#target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/AST)
 target_link_libraries(${PROJECT_NAME}
-        AST SymbolTable
+        PARSE_TREE SymbolTable
         ${FLEX_LIBRARIES}
         ${BISON_LIBRARIES}
 )
 
-#include(CTest)
-#add_test(NAME simple_test
-#        COMMAND ${CMAKE_BINARY_DIR}/Compiler test/test.cmm
-#)

@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "AST/AST.h"
+#include "ParseTree/ParseTree.h"
 
 #ifdef PARSER_DEBUG
 extern int yydebug;
@@ -40,8 +40,8 @@ int main(const int argc, char** argv) {
     const int rst = parse();
     if (rst == 0) {
         // print and free
-        printASTRoot();
-        cleanAST();
+        printParseTRoot();
+        cleanParseTree();
     }
 
     return 0;

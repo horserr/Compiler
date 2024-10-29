@@ -44,32 +44,32 @@ whitespace  [ \t\r]+
 
 "int"|"float" {
   ValueUnion value = {.identifier = yytext};
-  yylval = createASTNodeWithValue("TYPE", yylineno, value);
+  yylval = createParseTNodeWithValue("TYPE", yylineno, value);
   return TYPE;
 }
 (_|{letter})(_|{alnum})*  {
   ValueUnion value = {.identifier = yytext};
-  yylval = createASTNodeWithValue("ID", yylineno, value);
+  yylval = createParseTNodeWithValue("ID", yylineno, value);
   return ID;
 }
 {digit}+\.{digit}+  {
   ValueUnion value = {.float_value = strtof(yytext, NULL)};
-  yylval = createASTNodeWithValue("FLOAT", yylineno, value);
+  yylval = createParseTNodeWithValue("FLOAT", yylineno, value);
   return FLOAT;
 }
 0|([1-9]{digit}*) {
   ValueUnion value = {.int_value = atoi(yytext)};
-  yylval = createASTNodeWithValue("INT", yylineno, value);
+  yylval = createParseTNodeWithValue("INT", yylineno, value);
   return INT;
 }
 0[0-7]+ {
   ValueUnion value = {.int_value = strtol(yytext, NULL, 8)};
-  yylval = createASTNodeWithValue("INT", yylineno, value);
+  yylval = createParseTNodeWithValue("INT", yylineno, value);
   return INT;
 }
 0[xX][0-9a-fA-F]+ {
   ValueUnion value = {.int_value = strtol(yytext, NULL, 16)};
-  yylval = createASTNodeWithValue("INT", yylineno, value);
+  yylval = createParseTNodeWithValue("INT", yylineno, value);
   return INT;
 }
 

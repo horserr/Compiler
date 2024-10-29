@@ -1,10 +1,10 @@
 %code requires{
-  #include "AST/AST.h"
+  #include "ParseTree/ParseTree.h"
 }
 %{
   #ifdef LOCAL
     #include "lex.yy.h"
-    #include "AST/AST.h"
+    #include "ParseTree/ParseTree.h"
   #else
     #include "lex.yy.c"
   #endif
@@ -15,10 +15,10 @@
   #endif
 
   void yyerror(char* msg);
-  extern ASTNode *root; // Root of the AST
+  extern ParseTNode *root; // Root of the AST
 %}
 
-%define api.value.type {ASTNode*}
+%define api.value.type {ParseTNode*}
 %locations
 
 /* declared tokens */
@@ -48,34 +48,34 @@
 %%
 /* High-level Definitions */
 Program : ExtDefList {
-            root = createASTNode("Program", @$.first_line, 0);
+            root = createParseTNode("Program", @$.first_line, 0);
             addChild(root, $1);
         }
         ;
 
 ExtDefList : /* empty */ {
-                $$ = createASTNode("ExtDefList", @$.first_line, 0);
+                $$ = createParseTNode("ExtDefList", @$.first_line, 0);
             }
            | ExtDef ExtDefList {
-                $$ = createASTNode("ExtDefList", @$.first_line, 0);
+                $$ = createParseTNode("ExtDefList", @$.first_line, 0);
                 addChild($$, $1);
                 addChild($$, $2);
             }
            ;
 
 ExtDef : Specifier ExtDecList SEMI {
-            $$ = createASTNode("ExtDef", @$.first_line, 0);
+            $$ = createParseTNode("ExtDef", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
-            addChild($$, createASTNode("SEMI", @3.first_line, 1));
+            addChild($$, createParseTNode("SEMI", @3.first_line, 1));
         }
        | Specifier SEMI {
-            $$ = createASTNode("ExtDef", @$.first_line, 0);
+            $$ = createParseTNode("ExtDef", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("SEMI", @2.first_line, 1));
+            addChild($$, createParseTNode("SEMI", @2.first_line, 1));
         }
        | Specifier FunDec CompSt {
-            $$ = createASTNode("ExtDef", @$.first_line, 0);
+            $$ = createParseTNode("ExtDef", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
             addChild($$, $3);
@@ -83,101 +83,101 @@ ExtDef : Specifier ExtDecList SEMI {
        ;
 
 ExtDecList : VarDec {
-                $$ = createASTNode("ExtDecList", @$.first_line, 0);
+                $$ = createParseTNode("ExtDecList", @$.first_line, 0);
                 addChild($$, $1);
             }
            | VarDec COMMA ExtDecList {
-                $$ = createASTNode("ExtDecList", @$.first_line, 0);
+                $$ = createParseTNode("ExtDecList", @$.first_line, 0);
                 addChild($$, $1);
-                addChild($$, createASTNode("COMMA", @2.first_line, 1));
+                addChild($$, createParseTNode("COMMA", @2.first_line, 1));
                 addChild($$, $3);
             }
            ;
 
 /* Specifiers */
 Specifier : TYPE {
-                $$ = createASTNode("Specifier", @$.first_line, 0);
+                $$ = createParseTNode("Specifier", @$.first_line, 0);
                 addChild($$, $1);
             }
           | StructSpecifier {
-                $$ = createASTNode("Specifier", @$.first_line, 0);
+                $$ = createParseTNode("Specifier", @$.first_line, 0);
                 addChild($$, $1);
             }
           ;
 
 StructSpecifier : STRUCT OptTag LC DefList RC {
-                    $$ = createASTNode("StructSpecifier", @$.first_line, 0);
-                    addChild($$, createASTNode("STRUCT", @1.first_line, 1));
+                    $$ = createParseTNode("StructSpecifier", @$.first_line, 0);
+                    addChild($$, createParseTNode("STRUCT", @1.first_line, 1));
                     addChild($$, $2);
-                    addChild($$, createASTNode("LC", @3.first_line, 1));
+                    addChild($$, createParseTNode("LC", @3.first_line, 1));
                     addChild($$, $4);
-                    addChild($$, createASTNode("RC", @5.first_line, 1));
+                    addChild($$, createParseTNode("RC", @5.first_line, 1));
                 }
                 | STRUCT Tag {
-                    $$ = createASTNode("StructSpecifier", @$.first_line, 0);
-                    addChild($$, createASTNode("STRUCT", @1.first_line, 1));
+                    $$ = createParseTNode("StructSpecifier", @$.first_line, 0);
+                    addChild($$, createParseTNode("STRUCT", @1.first_line, 1));
                     addChild($$, $2);
                 }
                 ;
 
 OptTag : /* empty */ {
-            $$ = createASTNode("OptTag", @$.first_line, 0);
+            $$ = createParseTNode("OptTag", @$.first_line, 0);
         }
        | ID {
-            $$ = createASTNode("OptTag", @$.first_line, 0);
+            $$ = createParseTNode("OptTag", @$.first_line, 0);
             addChild($$, $1);
         }
        ;
 
 Tag : ID {
-        $$ = createASTNode("Tag", @$.first_line, 0);
+        $$ = createParseTNode("Tag", @$.first_line, 0);
         addChild($$, $1);
     }
     ;
 
 /* Declarators */
 VarDec : ID {
-            $$ = createASTNode("VarDec", @$.first_line, 0);
+            $$ = createParseTNode("VarDec", @$.first_line, 0);
             addChild($$, $1);
         }
        | VarDec LB INT RB {
-            $$ = createASTNode("VarDec", @$.first_line, 0);
+            $$ = createParseTNode("VarDec", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("LB", @2.first_line, 1));
+            addChild($$, createParseTNode("LB", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RB", @4.first_line, 1));
+            addChild($$, createParseTNode("RB", @4.first_line, 1));
         }
        ;
 
 FunDec : ID LP VarList RP {
-            $$ = createASTNode("FunDec", @$.first_line, 0);
+            $$ = createParseTNode("FunDec", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("LP", @2.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RP", @4.first_line, 1));
+            addChild($$, createParseTNode("RP", @4.first_line, 1));
         }
        | ID LP RP {
-            $$ = createASTNode("FunDec", @$.first_line, 0);
+            $$ = createParseTNode("FunDec", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("LP", @2.first_line, 1));
-            addChild($$, createASTNode("RP", @3.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
+            addChild($$, createParseTNode("RP", @3.first_line, 1));
         }
        ;
 
 VarList : ParamDec COMMA VarList {
-            $$ = createASTNode("VarList", @$.first_line, 0);
+            $$ = createParseTNode("VarList", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("COMMA", @2.first_line, 1));
+            addChild($$, createParseTNode("COMMA", @2.first_line, 1));
             addChild($$, $3);
      }
         | ParamDec {
-            $$ = createASTNode("VarList", @$.first_line, 0);
+            $$ = createParseTNode("VarList", @$.first_line, 0);
             addChild($$, $1);
         }
         ;
 
 ParamDec : Specifier VarDec {
-            $$ = createASTNode("ParamDec", @$.first_line, 0);
+            $$ = createParseTNode("ParamDec", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
         }
@@ -186,223 +186,223 @@ ParamDec : Specifier VarDec {
 /* Statements */
 /* variables can only be declared at the beginning of CompSt */
 CompSt : LC DefList StmtList RC {
-            $$ = createASTNode("CompSt", @$.first_line, 0);
-            addChild($$, createASTNode("LC", @1.first_line, 1));
+            $$ = createParseTNode("CompSt", @$.first_line, 0);
+            addChild($$, createParseTNode("LC", @1.first_line, 1));
             addChild($$, $2);
             addChild($$, $3);
-            addChild($$, createASTNode("RC", @4.first_line, 1));
+            addChild($$, createParseTNode("RC", @4.first_line, 1));
         }
        ;
 
 StmtList : /* empty */ {
-            $$ = createASTNode("StmtList", @$.first_line, 0);
+            $$ = createParseTNode("StmtList", @$.first_line, 0);
         }
          | Stmt StmtList {
-            $$ = createASTNode("StmtList", @$.first_line, 0);
+            $$ = createParseTNode("StmtList", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
         }
          ;
 
 Stmt : Exp SEMI {
-            $$ = createASTNode("Stmt", @$.first_line, 0);
+            $$ = createParseTNode("Stmt", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("SEMI", @2.first_line, 1));
+            addChild($$, createParseTNode("SEMI", @2.first_line, 1));
         }
      | CompSt {
-            $$ = createASTNode("Stmt", @$.first_line, 0);
+            $$ = createParseTNode("Stmt", @$.first_line, 0);
             addChild($$, $1);
         }
      | RETURN Exp SEMI {
-            $$ = createASTNode("Stmt", @$.first_line, 0);
-            addChild($$, createASTNode("RETURN", @1.first_line, 1));
+            $$ = createParseTNode("Stmt", @$.first_line, 0);
+            addChild($$, createParseTNode("RETURN", @1.first_line, 1));
             addChild($$, $2);
-            addChild($$, createASTNode("SEMI", @3.first_line, 1));
+            addChild($$, createParseTNode("SEMI", @3.first_line, 1));
         }
      | IF LP Exp RP Stmt %prec INFERIOR_ELSE {
-            $$ = createASTNode("Stmt", @$.first_line, 0);
-            addChild($$, createASTNode("IF", @1.first_line, 1));
-            addChild($$, createASTNode("LP", @2.first_line, 1));
+            $$ = createParseTNode("Stmt", @$.first_line, 0);
+            addChild($$, createParseTNode("IF", @1.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RP", @4.first_line, 1));
+            addChild($$, createParseTNode("RP", @4.first_line, 1));
             addChild($$, $5);
         }
      | IF LP Exp RP Stmt ELSE Stmt {
-            $$ = createASTNode("Stmt", @$.first_line, 0);
-            addChild($$, createASTNode("IF", @1.first_line, 1));
-            addChild($$, createASTNode("LP", @2.first_line, 1));
+            $$ = createParseTNode("Stmt", @$.first_line, 0);
+            addChild($$, createParseTNode("IF", @1.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RP", @4.first_line, 1));
+            addChild($$, createParseTNode("RP", @4.first_line, 1));
             addChild($$, $5);
-            addChild($$, createASTNode("ELSE", @6.first_line, 1));
+            addChild($$, createParseTNode("ELSE", @6.first_line, 1));
             addChild($$, $7);
         }
      | WHILE LP Exp RP Stmt {
-            $$ = createASTNode("Stmt", @$.first_line, 0);
-            addChild($$, createASTNode("WHILE", @1.first_line, 1));
-            addChild($$, createASTNode("LP", @2.first_line, 1));
+            $$ = createParseTNode("Stmt", @$.first_line, 0);
+            addChild($$, createParseTNode("WHILE", @1.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RP", @4.first_line, 1));
+            addChild($$, createParseTNode("RP", @4.first_line, 1));
             addChild($$, $5);
         }
      ;
 
 /* Local Definitions */
 DefList : /* empty */ {
-            $$ = createASTNode("DefList", @$.first_line, 0);
+            $$ = createParseTNode("DefList", @$.first_line, 0);
         }
         | Def DefList {
-            $$ = createASTNode("DefList", @$.first_line, 0);
+            $$ = createParseTNode("DefList", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
         }
         ;
 
 Def : Specifier DecList SEMI {
-            $$ = createASTNode("Def", @$.first_line, 0);
+            $$ = createParseTNode("Def", @$.first_line, 0);
             addChild($$, $1);
             addChild($$, $2);
-            addChild($$, createASTNode("SEMI", @3.first_line, 1));
+            addChild($$, createParseTNode("SEMI", @3.first_line, 1));
         }
     ;
 
 DecList : Dec {
-            $$ = createASTNode("DecList", @$.first_line, 0);
+            $$ = createParseTNode("DecList", @$.first_line, 0);
             addChild($$, $1);
         }
         | Dec COMMA DecList {
-            $$ = createASTNode("DecList", @$.first_line, 0);
+            $$ = createParseTNode("DecList", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("COMMA", @2.first_line, 1));
+            addChild($$, createParseTNode("COMMA", @2.first_line, 1));
             addChild($$, $3);
         }
         ;
 
 Dec : VarDec {
-            $$ = createASTNode("Dec", @$.first_line, 0);
+            $$ = createParseTNode("Dec", @$.first_line, 0);
             addChild($$, $1);
         }
     | VarDec ASSIGNOP Exp {
-            $$ = createASTNode("Dec", @$.first_line, 0);
+            $$ = createParseTNode("Dec", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("ASSIGNOP", @2.first_line, 1));
+            addChild($$, createParseTNode("ASSIGNOP", @2.first_line, 1));
             addChild($$, $3);
         }
     ;
 
 /* Expressions */
 Exp : Exp ASSIGNOP Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("ASSIGNOP", @2.first_line, 1));
+            addChild($$, createParseTNode("ASSIGNOP", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp AND Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("AND", @2.first_line, 1));
+            addChild($$, createParseTNode("AND", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp OR Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("OR", @2.first_line, 1));
+            addChild($$, createParseTNode("OR", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp RELOP Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("RELOP", @2.first_line, 1));
+            addChild($$, createParseTNode("RELOP", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp PLUS Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("PLUS", @2.first_line, 1));
+            addChild($$, createParseTNode("PLUS", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp MINUS Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("MINUS", @2.first_line, 1));
+            addChild($$, createParseTNode("MINUS", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp STAR Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("STAR", @2.first_line, 1));
+            addChild($$, createParseTNode("STAR", @2.first_line, 1));
             addChild($$, $3);
         }
     | Exp DIV Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("DIV", @2.first_line, 1));
+            addChild($$, createParseTNode("DIV", @2.first_line, 1));
             addChild($$, $3);
         }
     | LP Exp RP {
-            $$ = createASTNode("Exp", @$.first_line, 0);
-            addChild($$, createASTNode("LP", @1.first_line, 1));
+            $$ = createParseTNode("Exp", @$.first_line, 0);
+            addChild($$, createParseTNode("LP", @1.first_line, 1));
             addChild($$, $2);
-            addChild($$, createASTNode("RP", @3.first_line, 1));
+            addChild($$, createParseTNode("RP", @3.first_line, 1));
         }
     | MINUS Exp %prec UMINUS {
-            $$ = createASTNode("Exp", @$.first_line, 0);
-            addChild($$, createASTNode("MINUS", @1.first_line, 1));
+            $$ = createParseTNode("Exp", @$.first_line, 0);
+            addChild($$, createParseTNode("MINUS", @1.first_line, 1));
             addChild($$, $2);
         }
     | NOT Exp {
-            $$ = createASTNode("Exp", @$.first_line, 0);
-            addChild($$, createASTNode("NOT", @1.first_line, 1));
+            $$ = createParseTNode("Exp", @$.first_line, 0);
+            addChild($$, createParseTNode("NOT", @1.first_line, 1));
             addChild($$, $2);
         }
     | ID LP Args RP {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("LP", @2.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RP", @4.first_line, 1));
+            addChild($$, createParseTNode("RP", @4.first_line, 1));
         }
     | ID LP RP {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("LP", @2.first_line, 1));
-            addChild($$, createASTNode("RP", @3.first_line, 1));
+            addChild($$, createParseTNode("LP", @2.first_line, 1));
+            addChild($$, createParseTNode("RP", @3.first_line, 1));
         }
     | Exp LB Exp RB {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("LB", @2.first_line, 1));
+            addChild($$, createParseTNode("LB", @2.first_line, 1));
             addChild($$, $3);
-            addChild($$, createASTNode("RB", @4.first_line, 1));
+            addChild($$, createParseTNode("RB", @4.first_line, 1));
         }
     | Exp DOT ID {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("DOT", @2.first_line, 1));
+            addChild($$, createParseTNode("DOT", @2.first_line, 1));
             addChild($$, $3);
         }
     | ID {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
         }
     | INT {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
         }
     | FLOAT {
-            $$ = createASTNode("Exp", @$.first_line, 0);
+            $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
         }
     ;
 
 Args : Exp COMMA Args {
-            $$ = createASTNode("Args", @$.first_line, 0);
+            $$ = createParseTNode("Args", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createASTNode("COMMA", @2.first_line, 1));
+            addChild($$, createParseTNode("COMMA", @2.first_line, 1));
             addChild($$, $3);
         }
      | Exp {
-            $$ = createASTNode("Args", @$.first_line, 0);
+            $$ = createParseTNode("Args", @$.first_line, 0);
             addChild($$, $1);
         }
      ;

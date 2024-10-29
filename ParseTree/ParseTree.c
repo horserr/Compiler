@@ -1,12 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "AST.h"
+#include "ParseTree.h"
 
 #define THRESHOLD 0.75
 
 // the definition of root.
-ASTNode *root = NULL;
+ParseTNode *root = NULL;
 
 // Function to duplicate a string
 char *my_strdup(const char *src) {
@@ -29,9 +29,9 @@ char *my_strdup(const char *src) {
 static int initArrayList(ArrayList *list) {
     list->capacity = 4;
     list->num = 0;
-    list->container = (ASTNode **) malloc(list->capacity * sizeof(ASTNode *));
+    list->container = (ParseTNode **) malloc(list->capacity * sizeof(ParseTNode *));
     if (list->container == NULL) {
-        perror("fail to initialize array list in {AST.c initArrayList}.\n");
+        perror("fail to initialize array list in {ParseTree.c initArrayList}.\n");
         exit(EXIT_FAILURE);
     }
     return 0;
@@ -39,17 +39,17 @@ static int initArrayList(ArrayList *list) {
 
 static int resizeArrayList(ArrayList *list) {
     list->capacity *= 2;
-    list->container = (ASTNode **) realloc(list->container, list->capacity * sizeof(ASTNode *));
+    list->container = (ParseTNode **) realloc(list->container, list->capacity * sizeof(ParseTNode *));
     if (list->container == NULL) {
-        perror("fail to resize array list in {AST.c resizeArrayList}.\n");
+        perror("fail to resize array list in {ParseTree.c resizeArrayList}.\n");
         exit(EXIT_FAILURE);
     }
     return 0;
 }
 
-static void addToArrayList(ArrayList *list, ASTNode *node) {
+static void addToArrayList(ArrayList *list, ParseTNode *node) {
     if (list == NULL) {
-        perror("list is NULL in {AST.c addToArrayList}.\n");
+        perror("list is NULL in {ParseTree.c addToArrayList}.\n");
         exit(EXIT_FAILURE);
     }
     if (list->num >= list->capacity * THRESHOLD) {
@@ -63,24 +63,24 @@ static void freeArrayList(const ArrayList *list) {
         return;
     }
     for (int i = 0; i < list->num; ++i) {
-        freeASTNode(list->container[i]);
+        freeParseTNode(list->container[i]);
     }
     free(list->container);
     // free(list);
 }
 
-// AST Tree functions
-// Create a new AST node without a value
-ASTNode *createASTNode(const char *name, const int lineNum, const int flag) {
-    ASTNode *node = malloc(sizeof(ASTNode));
+// ParseTree Tree functions
+// Create a new ParseTree node without a value
+ParseTNode *createParseTNode(const char *name, const int lineNum, const int flag) {
+    ParseTNode *node = malloc(sizeof(ParseTNode));
     if (node == NULL) {
-        perror("fail to allocate memory for AST node in {AST.c createASTNode}.\n");
+        perror("fail to allocate memory for ParseTree node in {ParseTree.c createParseTNode}.\n");
         exit(EXIT_FAILURE);
     }
     node->flag = flag;
     node->name = my_strdup(name);
     if (node->name == NULL) {
-        perror("fail to duplicate string for AST node name in {AST.c createASTNode}.\n");
+        perror("fail to duplicate string for ParseTree node name in {ParseTree.c createParseTNode}.\n");
         free(node);
         exit(EXIT_FAILURE);
     }
@@ -98,14 +98,14 @@ static void copyValueUnion(ValueUnion *dest, const ValueUnion *src, const char *
     } else if (strcmp(type, "float") == 0) {
         dest->float_value = src->float_value;
     } else {
-        fprintf(stderr, "unknown type %s in {AST.c copyValueUnion}\n", type);
+        fprintf(stderr, "unknown type %s in {ParseTree.c copyValueUnion}\n", type);
         exit(EXIT_FAILURE);
     }
 }
 
-// Create a new AST node with a value
-ASTNode *createASTNodeWithValue(const char *name, const int lineNum, const ValueUnion value) {
-    ASTNode *node = createASTNode(name, lineNum, 1);
+// Create a new ParseTree node with a value
+ParseTNode *createParseTNodeWithValue(const char *name, const int lineNum, const ValueUnion value) {
+    ParseTNode *node = createParseTNode(name, lineNum, 1);
     if (strcmp(name, "INT") == 0) {
         copyValueUnion(&node->value, &value, "int");
     } else if (strcmp(name, "FLOAT") == 0) {
@@ -117,16 +117,16 @@ ASTNode *createASTNodeWithValue(const char *name, const int lineNum, const Value
 }
 
 // Add a child node to a parent node
-void addChild(ASTNode *parent, ASTNode *child) {
+void addChild(ParseTNode *parent, ParseTNode *child) {
     if (child == NULL) {
-        perror("child is a null pointer in {AST.c addChild}.\n");
+        perror("child is a null pointer in {ParseTree.c addChild}.\n");
         exit(EXIT_FAILURE);
     }
     addToArrayList(&parent->children, child);
 }
 
-// Free an AST node
-void freeASTNode(ASTNode *node) {
+// Free an ParseTree node
+void freeParseTNode(ParseTNode *node) {
     if (node == NULL) {
         return;
     }
@@ -138,8 +138,8 @@ void freeASTNode(ASTNode *node) {
     free(node);
 }
 
-// printAST helper function
-static void print(const ASTNode *root, const int level) {
+// printParseTree helper function
+static void print(const ParseTNode *root, const int level) {
     if (root->flag) {
         printf("%*s%s", level * 2, "", root->name);
         if (strcmp(root->name, "INT") == 0) {
@@ -164,58 +164,58 @@ static void print(const ASTNode *root, const int level) {
     }
 }
 
-// print out entire AST tree
-void printAST(const ASTNode *root) {
+// print out entire ParseTree tree
+void printParseTree(const ParseTNode *root) {
     if (root == NULL) {
-        perror("root is null in {AST.c printAST}.");
+        perror("root is null in {ParseTree.c printParseTree}.");
         exit(EXIT_FAILURE);
     }
     print(root, 0);
 }
 
-void printASTRoot() {
-    printAST(root);
+void printParseTRoot() {
+    printParseTree(root);
 }
 
-void cleanAST() {
-    freeASTNode(root);
+void cleanParseTree() {
+    freeParseTNode(root);
 }
 
 //////test code/////////////////////////////////////////////
-#ifdef AST_test
+#ifdef PARSE_TREE_test
 int main(int argc, char const *argv[]) {
-    // Test 1: Create a simple AST with a root and two children
-    ASTNode *root = createASTNode("root", 1, 0);
-    ASTNode *child1 = createASTNode("child1", 2, 0);
-    ASTNode *child2 = createASTNode("child2", 3, 0);
+    // Test 1: Create a simple ParseTree with a root and two children
+    ParseTNode *root = createParseTNode("root", 1, 0);
+    ParseTNode *child1 = createParseTNode("child1", 2, 0);
+    ParseTNode *child2 = createParseTNode("child2", 3, 0);
     addChild(root, child1);
     addChild(root, child2);
 
-    ASTNode *child3 = createASTNode("SEMI", 4, 1);
-    ASTNode *child4 = createASTNode("COMMA", 5, 1);
+    ParseTNode *child3 = createParseTNode("SEMI", 4, 1);
+    ParseTNode *child4 = createParseTNode("COMMA", 5, 1);
     addChild(root, child3);
     addChild(child1, child4);
 
     ValueUnion value = {.int_value = 3};
-    ASTNode *int_child = createASTNodeWithValue("INT", 6, value);
+    ParseTNode *int_child = createParseTNodeWithValue("INT", 6, value);
 
     ValueUnion value1 = {.identifier = "hello, wo!"};
-    ASTNode *id_child = createASTNodeWithValue("ID", 7, value1);
+    ParseTNode *id_child = createParseTNodeWithValue("ID", 7, value1);
 
     ValueUnion value3 = {.float_value = 3.01};
-    ASTNode *float_child = createASTNodeWithValue("FLOAT", 8, value3);
+    ParseTNode *float_child = createParseTNodeWithValue("FLOAT", 8, value3);
 
     ValueUnion value4 = {.identifier = "int"};
-    ASTNode *type_child = createASTNodeWithValue("TYPE", 9, value4);
+    ParseTNode *type_child = createParseTNodeWithValue("TYPE", 9, value4);
 
     addChild(child4, int_child);
     addChild(child4, id_child);
     addChild(child2, float_child);
     addChild(child2, type_child);
 
-    printf("Test 1: Simple AST\n");
-    printAST(root);
-    freeASTNode(root);
+    printf("Test 1: Simple Parse Tree\n");
+    printParseTree(root);
+    freeParseTNode(root);
 
     return 0;
 }
