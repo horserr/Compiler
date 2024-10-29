@@ -7,6 +7,7 @@ option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF
 ADD_COMPILE_DEFINITIONS("LOCAL")
 
 add_subdirectory(AST)
+add_subdirectory(SymbolTable)
 
 find_package(FLEX 2.6.4 REQUIRED)
 find_package(BISON 3.0.4 REQUIRED)
@@ -33,7 +34,7 @@ add_executable(${PROJECT_NAME}
 )
 #target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_SOURCE_DIR}/AST)
 target_link_libraries(${PROJECT_NAME}
-        AST
+        AST SymbolTable
         ${FLEX_LIBRARIES}
         ${BISON_LIBRARIES}
 )

@@ -72,7 +72,7 @@ static void freeArrayList(const ArrayList *list) {
 // AST Tree functions
 // Create a new AST node without a value
 ASTNode *createASTNode(const char *name, const int lineNum, const int flag) {
-    ASTNode *node = (ASTNode *) malloc(sizeof(ASTNode));
+    ASTNode *node = malloc(sizeof(ASTNode));
     if (node == NULL) {
         perror("fail to allocate memory for AST node in {AST.c createASTNode}.\n");
         exit(EXIT_FAILURE);
