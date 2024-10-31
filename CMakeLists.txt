@@ -4,7 +4,8 @@ set(CMAKE_C_STANDARD 11)
 
 option(PARSE_TREE_TEST "test PARSE TREE date structure" OFF)
 option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF)
-option(SYMBOL_TEST "test symbol table" ON)
+option(RBTREE_TEST "test red black tree" ON)
+option(SYMBOL_TEST "test symbol table" OFF)
 ADD_COMPILE_DEFINITIONS("LOCAL")
 
 add_subdirectory(ParseTree)

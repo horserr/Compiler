@@ -1,6 +1,4 @@
-#ifndef SYMBOL_TABEL
-#define SYMBOL_TABEL
-
+#ifndef SYMBOL_TABLE
+#define SYMBOL_TABLE
 
 #endif
-
