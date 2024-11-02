@@ -5,46 +5,44 @@
 
 typedef struct Type Type;
 
-typedef struct structElement {
-    Type *elemType;
-    struct structElement *next; // todo be cautious about null pointer
-} structElement;
+typedef struct structFieldElement {
+    char* name;
+    Type* elemType;
+    struct structFieldElement* next; // todo be cautious about null pointer
+} structFieldElement;
 
-struct Type {
+struct {
     enum { INT, FLOAT, ARRAY, STRUCTURE } kind;
 
     union {
         // array needs element type and size
         struct {
-            struct Type *elemType;
+            Type* elemType;
             int size;
         } array;
 
-        // structure needs name and a list of elements with type respectively
-        struct {
-            char *name;
-            structElement *elements;
-        } structure;
+        // structure needs a list of fields
+        structFieldElement* fields;
     };
-};
+} TYPE;
 
-struct Data {
+typedef struct {
+    char* name;
+
     enum { VAR, FUNC } kind;
-
-    char *lexeme;
 
     union {
         struct {
-            Type *type;
+            Type* type;
         } variable;
 
         struct {
-            Type *returnType;
+            Type* returnType;
             int argc;
-            Type *argv;
+            Type** argvTypes;
         } function;
     };
-};
+} Data;
 
 ///// Red Black Tree /////////////////////////////////////////
 // Node structure for the Red-Black Tree
@@ -55,9 +53,9 @@ typedef struct Node {
 } Node;
 
 // Red-Black Tree class
-typedef struct RedBlackTree {
-    Node *root;
-    Node *NIL;
+typedef struct {
+    Node* root;
+    Node* NIL;
 } RedBlackTree;
 
 /**
@@ -65,13 +63,17 @@ typedef struct RedBlackTree {
  *@return negative if n1 < data
  *@return zero     if n1 = data
 */
-static int nodeCompareWithData(const Node *n1, const int data) {
+static int nodeCompareWithData(const Node* n1, const int data) {
     return n1->data - data;
 }
 
+static int copyNodeData(int data) {
+    return data;
+}
+
 // Utility function to create a new node
-static Node *createNode(int data, Node *NIL) {
-    Node *newNode = malloc(sizeof(Node));
+static Node* createNode(int data, Node* NIL) {
+    Node* newNode = malloc(sizeof(Node));
     newNode->data = data;
     strcpy(newNode->color, "RED");
     newNode->left = NIL;
@@ -81,8 +83,8 @@ static Node *createNode(int data, Node *NIL) {
 }
 
 // Utility function to perform left rotation
-static void leftRotate(RedBlackTree *tree, Node *x) {
-    Node *y = x->right;
+static void leftRotate(RedBlackTree* tree, Node* x) {
+    Node* y = x->right;
     x->right = y->left;
     if (y->left != tree->NIL) {
         y->left->parent = x;
@@ -90,9 +92,11 @@ static void leftRotate(RedBlackTree *tree, Node *x) {
     y->parent = x->parent;
     if (x->parent == NULL) {
         tree->root = y;
-    } else if (x == x->parent->left) {
+    }
+    else if (x == x->parent->left) {
         x->parent->left = y;
-    } else {
+    }
+    else {
         x->parent->right = y;
     }
     y->left = x;
@@ -100,8 +104,8 @@ static void leftRotate(RedBlackTree *tree, Node *x) {
 }
 
 // Utility function to perform right rotation
-static void rightRotate(RedBlackTree *tree, Node *x) {
-    Node *y = x->left;
+static void rightRotate(RedBlackTree* tree, Node* x) {
+    Node* y = x->left;
     x->left = y->right;
     if (y->right != tree->NIL) {
         y->right->parent = x;
@@ -109,9 +113,11 @@ static void rightRotate(RedBlackTree *tree, Node *x) {
     y->parent = x->parent;
     if (x->parent == NULL) {
         tree->root = y;
-    } else if (x == x->parent->right) {
+    }
+    else if (x == x->parent->right) {
         x->parent->right = y;
-    } else {
+    }
+    else {
         x->parent->left = y;
     }
     y->right = x;
@@ -119,16 +125,17 @@ static void rightRotate(RedBlackTree *tree, Node *x) {
 }
 
 // Function to fix Red-Black Tree properties after insertion
-static void fixInsert(RedBlackTree *tree, Node *k) {
+static void fixInsert(RedBlackTree* tree, Node* k) {
     while (k != tree->root && strcmp(k->parent->color, "RED") == 0) {
         if (k->parent == k->parent->parent->left) {
-            Node *u = k->parent->parent->right; // uncle
+            Node* u = k->parent->parent->right; // uncle
             if (strcmp(u->color, "RED") == 0) {
                 strcpy(k->parent->color, "BLACK");
                 strcpy(u->color, "BLACK");
                 strcpy(k->parent->parent->color, "RED");
                 k = k->parent->parent;
-            } else {
+            }
+            else {
                 if (k == k->parent->right) {
                     k = k->parent;
                     leftRotate(tree, k);
@@ -137,14 +144,16 @@ static void fixInsert(RedBlackTree *tree, Node *k) {
                 strcpy(k->parent->parent->color, "RED");
                 rightRotate(tree, k->parent->parent);
             }
-        } else {
-            Node *u = k->parent->parent->left; // uncle
+        }
+        else {
+            Node* u = k->parent->parent->left; // uncle
             if (strcmp(u->color, "RED") == 0) {
                 strcpy(k->parent->color, "BLACK");
                 strcpy(u->color, "BLACK");
                 strcpy(k->parent->parent->color, "RED");
                 k = k->parent->parent;
-            } else {
+            }
+            else {
                 if (k == k->parent->left) {
                     k = k->parent;
                     rightRotate(tree, k);
@@ -159,7 +168,7 @@ static void fixInsert(RedBlackTree *tree, Node *k) {
 }
 
 // Inorder traversal helper function
-static void inorderHelper(const Node *node, Node *NIL) {
+static void inorderHelper(const Node* node, Node* NIL) {
     if (node != NIL) {
         inorderHelper(node->left, NIL);
         printf("%d ", node->data);
@@ -168,19 +177,19 @@ static void inorderHelper(const Node *node, Node *NIL) {
 }
 
 // Search helper function
-static Node *searchHelper(Node *node, int data, Node *NIL) {
-    if (node == NIL || nodeCompareWithData(node, data)) {
+static Node* searchHelper(Node* node, int data, Node* NIL) {
+    if (node == NIL || nodeCompareWithData(node, data) == 0/*node->data == data*/) {
         return node;
     }
-    if (data < node->data) {
+    if (nodeCompareWithData(node, data) > 0) {
         return searchHelper(node->left, data, NIL);
     }
     return searchHelper(node->right, data, NIL);
 }
 
 // Constructor
-RedBlackTree *createRedBlackTree() {
-    RedBlackTree *tree = malloc(sizeof(RedBlackTree));
+RedBlackTree* createRedBlackTree() {
+    RedBlackTree* tree = malloc(sizeof(RedBlackTree));
     tree->NIL = createNode(0, NULL);
     strcpy(tree->NIL->color, "BLACK");
     tree->NIL->left = tree->NIL->right = tree->NIL;
@@ -189,18 +198,19 @@ RedBlackTree *createRedBlackTree() {
 }
 
 // Insert function
-void insert(RedBlackTree *tree, int data) {
-    Node *new_node = createNode(data, tree->NIL);
+void insert(RedBlackTree* tree, int data) {
+    Node* new_node = createNode(data, tree->NIL);
 
-    Node *parent = NULL;
-    Node *current = tree->root;
+    Node* parent = NULL;
+    Node* current = tree->root;
 
     // BST insert
     while (current != tree->NIL) {
         parent = current;
-        if (new_node->data < current->data) {
+        if (nodeCompareWithData(current, data) > 0/*new_node->data < current->data*/) {
             current = current->left;
-        } else {
+        }
+        else {
             current = current->right;
         }
     }
@@ -209,9 +219,11 @@ void insert(RedBlackTree *tree, int data) {
 
     if (parent == NULL) {
         tree->root = new_node;
-    } else if (new_node->data < parent->data) {
+    }
+    else if (nodeCompareWithData(parent, data) > 0/*new_node->data < parent->data*/) {
         parent->left = new_node;
-    } else {
+    }
+    else {
         parent->right = new_node;
     }
 
@@ -228,18 +240,18 @@ void insert(RedBlackTree *tree, int data) {
 }
 
 // Inorder traversal
-void inorder(const RedBlackTree *tree) {
+void inorder(const RedBlackTree* tree) {
     inorderHelper(tree->root, tree->NIL);
 }
 
 // Search function
-Node *search(const RedBlackTree *tree, int data) {
+Node* search(const RedBlackTree* tree, int data) {
     return searchHelper(tree->root, data, tree->NIL);
 }
 
 #ifdef RBTREE_test
 int main() {
-    RedBlackTree *rbt = createRedBlackTree();
+    RedBlackTree* rbt = createRedBlackTree();
 
     // Inserting elements
     insert(rbt, 10);
