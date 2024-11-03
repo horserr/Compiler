@@ -249,6 +249,22 @@ Node* search(const RedBlackTree* tree, int data) {
     return searchHelper(tree->root, data, tree->NIL);
 }
 
+// Helper function to free nodes
+static void freeNodes(Node* node, Node* NIL) {
+    if (node != NIL) {
+        freeNodes(node->left, NIL);
+        freeNodes(node->right, NIL);
+        free(node);
+    }
+}
+
+// Function to free the Red-Black Tree
+void freeRedBlackTree(RedBlackTree* tree) {
+    freeNodes(tree->root, tree->NIL);
+    free(tree->NIL);
+    free(tree);
+}
+
 #ifdef RBTREE_test
 int main() {
     RedBlackTree* rbt = createRedBlackTree();
@@ -290,6 +306,8 @@ int main() {
     printf("Inorder traversal after inserting more elements:\n");
     inorder(rbt); // Expected Output: 1 5 10 10 15 20 25 30 35 40 50
     printf("\n");
+
+    freeRedBlackTree(rbt);
 
     return 0;
 }
