@@ -307,6 +307,15 @@ int main() {
     inorder(rbt); // Expected Output: 1 5 10 10 15 20 25 30 35 40 50
     printf("\n");
 
+
+    // try and test sanitizer
+    int a[5] = {0};
+    // for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < 5; ++i) {
+        a[i] = i;
+    }
+    printf("finished\n");
+
     freeRedBlackTree(rbt);
 
     return 0;

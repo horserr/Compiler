@@ -8,8 +8,37 @@ option(RBTREE_TEST "test red black tree" ON)
 option(SYMBOL_TEST "test symbol table" OFF)
 ADD_COMPILE_DEFINITIONS("LOCAL")
 
+# todo add sanitizer flags in debug mode and git
+# Set sanitizer flags
+set(SANITIZER_FLAGS "-fsanitize=address")
+set(DEBUG_FLAGS "-g")
+# Define ASAN options as a list
+set(ASAN_OPTIONS_LIST
+        "detect_leaks=1"
+        "detect_stack_use_after_return=1"
+        "detect_stack_use_after_scope=1"
+        "halt_on_error=1"
+        "verbosity=1"
+        "malloc_context_size=4"
+        # "detect_invalid_pointer_pairs=1"
+)
+
+# Add subdirectories
 add_subdirectory(ParseTree)
 add_subdirectory(SymbolTable)
+
+# Create a library with sanitizer flags
+add_library(sanitizer_flags INTERFACE)
+target_compile_options(sanitizer_flags INTERFACE ${SANITIZER_FLAGS} ${DEBUG_FLAGS})
+target_link_libraries(sanitizer_flags INTERFACE ${SANITIZER_FLAGS})
+# Turn option list into a single string
+message(STATUS "ASAN_OPTIONS_LIST is ${ASAN_OPTIONS_LIST}")
+list(JOIN ASAN_OPTIONS_LIST ":" ASAN_OPTIONS)
+message(STATUS "ASAN_OPTIONS is ${ASAN_OPTIONS}")
+# Set sanitizer environment variables
+set_target_properties(sanitizer_flags PROPERTIES
+        INTERFACE_COMPILE_DEFINITIONS "ASAN_OPTIONS=${ASAN_OPTIONS}")
+# todo link this library to other targets
 
 find_package(FLEX 2.6.4 REQUIRED)
 find_package(BISON 3.0.4 REQUIRED)
