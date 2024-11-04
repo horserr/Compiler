@@ -67,5 +67,6 @@ target_link_libraries(${PROJECT_NAME}
         PARSE_TREE SymbolTable
         ${FLEX_LIBRARIES}
         ${BISON_LIBRARIES}
+        sanitizer_flags
 )
 

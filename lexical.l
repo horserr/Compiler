@@ -43,12 +43,12 @@ whitespace  [ \t\r]+
 "while" { return WHILE; }
 
 "int"|"float" {
-  ValueUnion value = {.identifier = yytext};
+  ValueUnion value = {.str_value = yytext};
   yylval = createParseTNodeWithValue("TYPE", yylineno, value);
   return TYPE;
 }
 (_|{letter})(_|{alnum})*  {
-  ValueUnion value = {.identifier = yytext};
+  ValueUnion value = {.str_value = yytext};
   yylval = createParseTNodeWithValue("ID", yylineno, value);
   return ID;
 }

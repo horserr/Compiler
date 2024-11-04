@@ -6,15 +6,15 @@
 #define THRESHOLD 0.75
 
 // the definition of root.
-ParseTNode *root = NULL;
+ParseTNode* root = NULL;
 
 // Function to duplicate a string
-char *my_strdup(const char *src) {
+char* my_strdup(const char* src) {
     if (src == NULL) {
         return NULL;
     }
     // Allocate memory for the new string
-    char *dest = (char *)malloc(strlen(src) + 1);
+    char* dest = (char*)malloc(strlen(src) + 1);
     if (dest == NULL) {
         perror("fail to allocate memory in {my_strdup}.\n");
         exit(EXIT_FAILURE);
@@ -26,10 +26,10 @@ char *my_strdup(const char *src) {
 }
 
 // Array List functions
-static int initArrayList(ArrayList *list) {
+static int initArrayList(ArrayList* list) {
     list->capacity = 4;
     list->num = 0;
-    list->container = (ParseTNode **) malloc(list->capacity * sizeof(ParseTNode *));
+    list->container = (ParseTNode**)malloc(list->capacity * sizeof(ParseTNode*));
     if (list->container == NULL) {
         perror("fail to initialize array list in {ParseTree.c initArrayList}.\n");
         exit(EXIT_FAILURE);
@@ -37,9 +37,9 @@ static int initArrayList(ArrayList *list) {
     return 0;
 }
 
-static int resizeArrayList(ArrayList *list) {
+static int resizeArrayList(ArrayList* list) {
     list->capacity *= 2;
-    list->container = (ParseTNode **) realloc(list->container, list->capacity * sizeof(ParseTNode *));
+    list->container = (ParseTNode**)realloc(list->container, list->capacity * sizeof(ParseTNode*));
     if (list->container == NULL) {
         perror("fail to resize array list in {ParseTree.c resizeArrayList}.\n");
         exit(EXIT_FAILURE);
@@ -47,7 +47,7 @@ static int resizeArrayList(ArrayList *list) {
     return 0;
 }
 
-static void addToArrayList(ArrayList *list, ParseTNode *node) {
+static void addToArrayList(ArrayList* list, ParseTNode* node) {
     if (list == NULL) {
         perror("list is NULL in {ParseTree.c addToArrayList}.\n");
         exit(EXIT_FAILURE);
@@ -58,7 +58,7 @@ static void addToArrayList(ArrayList *list, ParseTNode *node) {
     list->container[list->num++] = node;
 }
 
-static void freeArrayList(const ArrayList *list) {
+static void freeArrayList(const ArrayList* list) {
     if (list == NULL) {
         return;
     }
@@ -71,8 +71,12 @@ static void freeArrayList(const ArrayList *list) {
 
 // ParseTree Tree functions
 // Create a new ParseTree node without a value
-ParseTNode *createParseTNode(const char *name, const int lineNum, const int flag) {
-    ParseTNode *node = malloc(sizeof(ParseTNode));
+ParseTNode* createParseTNode(const char* name, const int lineNum, const int flag) {
+    if (flag != 0 && flag != 1) {
+        perror("Wrong flag value in {ParseTree.c}.\n");
+        exit(EXIT_FAILURE);
+    }
+    ParseTNode* node = malloc(sizeof(ParseTNode));
     if (node == NULL) {
         perror("fail to allocate memory for ParseTree node in {ParseTree.c createParseTNode}.\n");
         exit(EXIT_FAILURE);
@@ -90,34 +94,39 @@ ParseTNode *createParseTNode(const char *name, const int lineNum, const int flag
 }
 
 // Function to copy ValueUnion
-static void copyValueUnion(ValueUnion *dest, const ValueUnion *src, const char *type) {
+static void copyValueUnion(ValueUnion* dest, const ValueUnion* src, const char* type) {
     if (strcmp(type, "id") == 0) {
-        dest->identifier = my_strdup(src->identifier);
-    } else if (strcmp(type, "int") == 0) {
+        dest->str_value = my_strdup(src->str_value);
+    }
+    else if (strcmp(type, "int") == 0) {
         dest->int_value = src->int_value;
-    } else if (strcmp(type, "float") == 0) {
+    }
+    else if (strcmp(type, "float") == 0) {
         dest->float_value = src->float_value;
-    } else {
+    }
+    else {
         fprintf(stderr, "unknown type %s in {ParseTree.c copyValueUnion}\n", type);
         exit(EXIT_FAILURE);
     }
 }
 
 // Create a new ParseTree node with a value
-ParseTNode *createParseTNodeWithValue(const char *name, const int lineNum, const ValueUnion value) {
-    ParseTNode *node = createParseTNode(name, lineNum, 1);
+ParseTNode* createParseTNodeWithValue(const char* name, const int lineNum, const ValueUnion value) {
+    ParseTNode* node = createParseTNode(name, lineNum, 1);
     if (strcmp(name, "INT") == 0) {
         copyValueUnion(&node->value, &value, "int");
-    } else if (strcmp(name, "FLOAT") == 0) {
+    }
+    else if (strcmp(name, "FLOAT") == 0) {
         copyValueUnion(&node->value, &value, "float");
-    } else if (strcmp(name, "ID") == 0 || strcmp(name, "TYPE") == 0) {
+    }
+    else if (strcmp(name, "ID") == 0 || strcmp(name, "TYPE") == 0) {
         copyValueUnion(&node->value, &value, "id");
     }
     return node;
 }
 
 // Add a child node to a parent node
-void addChild(ParseTNode *parent, ParseTNode *child) {
+void addChild(ParseTNode* parent, ParseTNode* child) {
     if (child == NULL) {
         perror("child is a null pointer in {ParseTree.c addChild}.\n");
         exit(EXIT_FAILURE);
@@ -126,28 +135,30 @@ void addChild(ParseTNode *parent, ParseTNode *child) {
 }
 
 // Free an ParseTree node
-void freeParseTNode(ParseTNode *node) {
+void freeParseTNode(ParseTNode* node) {
     if (node == NULL) {
         return;
     }
     freeArrayList(&node->children);
     if (strcmp(node->name, "ID") == 0 || strcmp(node->name, "TYPE") == 0) {
-        free(node->value.identifier);
+        free(node->value.str_value);
     }
     free(node->name);
     free(node);
 }
 
 // printParseTree helper function
-static void print(const ParseTNode *root, const int level) {
-    if (root->flag) {
+static void print(const ParseTNode* root, const int level) {
+    if (root->flag) { // token
         printf("%*s%s", level * 2, "", root->name);
         if (strcmp(root->name, "INT") == 0) {
             printf(": %d", root->value.int_value);
-        } else if (strcmp(root->name, "FLOAT") == 0) {
+        }
+        else if (strcmp(root->name, "FLOAT") == 0) {
             printf(": %f", root->value.float_value);
-        } else if (strcmp(root->name, "TYPE") == 0 || strcmp(root->name, "ID") == 0) {
-            printf(": %s", root->value.identifier);
+        }
+        else if (strcmp(root->name, "TYPE") == 0 || strcmp(root->name, "ID") == 0) {
+            printf(": %s", root->value.str_value);
         }
         printf("\n");
         return;
@@ -165,7 +176,7 @@ static void print(const ParseTNode *root, const int level) {
 }
 
 // print out entire ParseTree tree
-void printParseTree(const ParseTNode *root) {
+void printParseTree(const ParseTNode* root) {
     if (root == NULL) {
         perror("root is null in {ParseTree.c printParseTree}.");
         exit(EXIT_FAILURE);
@@ -199,13 +210,13 @@ int main(int argc, char const *argv[]) {
     ValueUnion value = {.int_value = 3};
     ParseTNode *int_child = createParseTNodeWithValue("INT", 6, value);
 
-    ValueUnion value1 = {.identifier = "hello, wo!"};
+    ValueUnion value1 = {.str_value = "hello, wo!"};
     ParseTNode *id_child = createParseTNodeWithValue("ID", 7, value1);
 
     ValueUnion value3 = {.float_value = 3.01};
     ParseTNode *float_child = createParseTNodeWithValue("FLOAT", 8, value3);
 
-    ValueUnion value4 = {.identifier = "int"};
+    ValueUnion value4 = {.str_value = "int"};
     ParseTNode *type_child = createParseTNodeWithValue("TYPE", 9, value4);
 
     addChild(child4, int_child);

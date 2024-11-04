@@ -21,7 +21,7 @@ typedef struct Node {
 } Node;
 
 // Red-Black Tree class
-struct RedBlackTree{
+struct RedBlackTree {
     Node* root;
     Node* NIL;
 };
