@@ -1,131 +1,16 @@
-#include "RBTree.h"
+/** Credit:
+This code is provided by @author costheta_z
 
+    C implementation for Red-Black Tree Insertion.
+    visit https://www.geeksforgeeks.org/introduction-to-red-black-tree/?ref=header_outind for more information
+**/
+#include "RBTree.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct Type Type;
-
-typedef struct structFieldElement {
-    char* name;
-    Type* elemType;
-    struct structFieldElement* next;
-} structFieldElement;
-
-struct Type {
-    enum { INT, FLOAT, ARRAY, STRUCTURE } kind;
-
-    union {
-        // array needs element type and size
-        struct {
-            Type* elemType;
-            int size;
-        } array;
-
-        // structure needs a list of fields
-        structFieldElement* fields;
-    };
-};
-
-void typeToString(Type* t) {
-    // todo
-}
-
 static void freeType(Type* t);
-
-static void freeStructFieldElement(structFieldElement* e) {
-    while (e != NULL) {
-        structFieldElement* tmp = e;
-        e = e->next;
-        free(tmp->name);
-        freeType(tmp->elemType);
-        free(tmp);
-    }
-}
-
-static void freeType(Type* t) {
-    if (t == NULL) {
-        perror("Can't free a null pointer. {RBTree.c freeType}\n");
-        exit(EXIT_FAILURE);
-    }
-    switch (t->kind) {
-    case INT:
-    case FLOAT:
-        break;
-    case ARRAY:
-        freeType(t->array.elemType);
-        break;
-    case STRUCTURE:
-        freeStructFieldElement(t->fields);
-        break;
-    default:
-        perror("false type to free in {RBTree.c freeType}.\n");
-        exit(EXIT_FAILURE);
-    }
-    free(t);
-}
-
-typedef struct {
-    char* name;
-
-    enum { VAR, FUNC } kind;
-
-    union {
-        struct {
-            Type* type;
-        } variable;
-
-        struct {
-            Type* returnType;
-            int argc;
-            Type** argvTypes;
-        } function;
-    };
-} Data;
-
-void dataToString(Data* d) {
-    if (d == NULL) {
-        perror("Can't print out null data. {RBTree.c dataToString}\n");
-        exit(EXIT_FAILURE);
-    }
-    switch (d->kind) {
-    case VAR:
-        printf("Data<variable>: \n");
-        break;
-    case FUNC:
-        printf("Data<function>: \n");
-        break;
-    default:
-        perror("false type of data. {RBTree.c dataToString}\n");
-        exit(EXIT_FAILURE);
-    }
-    printf("%*s%s\n", 4, "", d->name);
-}
-
-static void freeData(Data* d) {
-    if (d == NULL) {
-        perror("Can't free null Data. {RBTree.c freeData}\n");
-        exit(EXIT_FAILURE);
-    }
-    switch (d->kind) {
-    case VAR:
-        freeType(d->variable.type);
-        break;
-    case FUNC:
-        freeType(d->function.returnType);
-        for (int i = 0; i < d->function.argc; ++i) {
-            freeType(d->function.argvTypes[i]);
-        }
-        free(d->function.argvTypes);
-        break;
-    default:
-        perror("false type to free in {RBTree.c freeData}.\n");
-        exit(EXIT_FAILURE);
-    }
-    free(d->name);
-    free(d);
-}
 
 ///// Red Black Tree /////////////////////////////////////////
 // Node structure for the Red-Black Tree
@@ -136,10 +21,10 @@ typedef struct Node {
 } Node;
 
 // Red-Black Tree class
-typedef struct {
+struct RedBlackTree{
     Node* root;
     Node* NIL;
-} RedBlackTree;
+};
 
 /**
  *@return positive if n1 > data
@@ -266,7 +151,7 @@ static Node* searchHelper(Node* node, Data* data, Node* NIL) {
     return searchHelper(node->right, data, NIL);
 }
 
-// Constructor
+// Constructor or Red Black Tree
 RedBlackTree* createRedBlackTree() {
     RedBlackTree* tree = malloc(sizeof(RedBlackTree));
     tree->NIL = createNode(NULL, NULL);
@@ -324,8 +209,73 @@ void inorder(const RedBlackTree* tree) {
 }
 
 // Search function
-Node* search(const RedBlackTree* tree, Data* data) {
+static Node* search(const RedBlackTree* tree, Data* data) {
     return searchHelper(tree->root, data, tree->NIL);
+}
+
+const Data* searchWithName(const RedBlackTree* tree, char* name) {
+    Data* data = malloc(sizeof(Data));
+    data->name = name;
+    const Data* rst = search(tree, data)->data;
+    free(data);
+    return rst;
+}
+
+///// utilities functions of free ////////////////////////////
+static void freeStructFieldElement(structFieldElement* e) {
+    while (e != NULL) {
+        structFieldElement* tmp = e;
+        e = e->next;
+        free(tmp->name);
+        freeType(tmp->elemType);
+        free(tmp);
+    }
+}
+
+static void freeType(Type* t) {
+    if (t == NULL) {
+        perror("Can't free a null pointer. {RBTree.c freeType}\n");
+        exit(EXIT_FAILURE);
+    }
+    switch (t->kind) {
+    case INT:
+    case FLOAT:
+        break;
+    case ARRAY:
+        freeType(t->array.elemType);
+        break;
+    case STRUCTURE:
+        freeStructFieldElement(t->fields);
+        break;
+    default:
+        perror("false type to free in {RBTree.c freeType}.\n");
+        exit(EXIT_FAILURE);
+    }
+    free(t);
+}
+
+static void freeData(Data* d) {
+    if (d == NULL) {
+        perror("Can't free null Data. {RBTree.c freeData}\n");
+        exit(EXIT_FAILURE);
+    }
+    switch (d->kind) {
+    case VAR:
+        freeType(d->variable.type);
+        break;
+    case FUNC:
+        freeType(d->function.returnType);
+        for (int i = 0; i < d->function.argc; ++i) {
+            freeType(d->function.argvTypes[i]);
+        }
+        free(d->function.argvTypes);
+        break;
+    default:
+        perror("false type to free in {RBTree.c freeData}.\n");
+        exit(EXIT_FAILURE);
+    }
+    free(d->name);
+    free(d);
 }
 
 // Helper function to free nodes
@@ -345,9 +295,33 @@ void freeRedBlackTree(RedBlackTree* tree) {
     free(tree);
 }
 
+///// print helpers //////////////////////////////////////////
+void typeToString(Type* t) {
+    // todo
+}
+
+void dataToString(Data* d) {
+    if (d == NULL) {
+        perror("Can't print out null data. {RBTree.c dataToString}\n");
+        exit(EXIT_FAILURE);
+    }
+    switch (d->kind) {
+    case VAR:
+        printf("Data<variable>: \n");
+        break;
+    case FUNC:
+        printf("Data<function>: \n");
+        break;
+    default:
+        perror("false type of data. {RBTree.c dataToString}\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("%*s%s\n", 4, "", d->name);
+}
+
 #ifdef RBTREE_test
 void testInsertAndSearchIntFloat() {
-    RedBlackTree* rbt = createRedBlackTree();
+    const RedBlackTree* rbt = createRedBlackTree();
 
     Data* data1 = malloc(sizeof(Data));
     data1->name = strdup("data1");
@@ -370,14 +344,16 @@ void testInsertAndSearchIntFloat() {
     assert(foundNode != rbt->NIL);
     assert(strcmp(foundNode->data->name, "data1") == 0);
 
-    searchData.name = "data2";
-    foundNode = search(rbt, &searchData);
-    assert(foundNode != rbt->NIL);
-    assert(strcmp(foundNode->data->name, "data2") == 0);
+    Data* foundData = searchWithName(rbt, "data2");
+    assert(foundData != NULL);
+    assert(strcmp(foundData->name, "data2") == 0);
 
     searchData.name = "data3";
     foundNode = search(rbt, &searchData);
     assert(foundNode == rbt->NIL);
+
+    foundData = searchWithName(rbt, "data4");
+    assert(foundData == NULL);
 
     freeRedBlackTree(rbt);
 }
