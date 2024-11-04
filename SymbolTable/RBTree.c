@@ -1,4 +1,6 @@
 #include "RBTree.h"
+
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,10 +10,10 @@ typedef struct Type Type;
 typedef struct structFieldElement {
     char* name;
     Type* elemType;
-    struct structFieldElement* next; // todo be cautious about null pointer
+    struct structFieldElement* next;
 } structFieldElement;
 
-struct {
+struct Type {
     enum { INT, FLOAT, ARRAY, STRUCTURE } kind;
 
     union {
@@ -24,7 +26,45 @@ struct {
         // structure needs a list of fields
         structFieldElement* fields;
     };
-} TYPE;
+};
+
+void typeToString(Type* t) {
+    // todo
+}
+
+static void freeType(Type* t);
+
+static void freeStructFieldElement(structFieldElement* e) {
+    while (e != NULL) {
+        structFieldElement* tmp = e;
+        e = e->next;
+        free(tmp->name);
+        freeType(tmp->elemType);
+        free(tmp);
+    }
+}
+
+static void freeType(Type* t) {
+    if (t == NULL) {
+        perror("Can't free a null pointer. {RBTree.c freeType}\n");
+        exit(EXIT_FAILURE);
+    }
+    switch (t->kind) {
+    case INT:
+    case FLOAT:
+        break;
+    case ARRAY:
+        freeType(t->array.elemType);
+        break;
+    case STRUCTURE:
+        freeStructFieldElement(t->fields);
+        break;
+    default:
+        perror("false type to free in {RBTree.c freeType}.\n");
+        exit(EXIT_FAILURE);
+    }
+    free(t);
+}
 
 typedef struct {
     char* name;
@@ -44,10 +84,53 @@ typedef struct {
     };
 } Data;
 
+void dataToString(Data* d) {
+    if (d == NULL) {
+        perror("Can't print out null data. {RBTree.c dataToString}\n");
+        exit(EXIT_FAILURE);
+    }
+    switch (d->kind) {
+    case VAR:
+        printf("Data<variable>: \n");
+        break;
+    case FUNC:
+        printf("Data<function>: \n");
+        break;
+    default:
+        perror("false type of data. {RBTree.c dataToString}\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("%*s%s\n", 4, "", d->name);
+}
+
+static void freeData(Data* d) {
+    if (d == NULL) {
+        perror("Can't free null Data. {RBTree.c freeData}\n");
+        exit(EXIT_FAILURE);
+    }
+    switch (d->kind) {
+    case VAR:
+        freeType(d->variable.type);
+        break;
+    case FUNC:
+        freeType(d->function.returnType);
+        for (int i = 0; i < d->function.argc; ++i) {
+            freeType(d->function.argvTypes[i]);
+        }
+        free(d->function.argvTypes);
+        break;
+    default:
+        perror("false type to free in {RBTree.c freeData}.\n");
+        exit(EXIT_FAILURE);
+    }
+    free(d->name);
+    free(d);
+}
+
 ///// Red Black Tree /////////////////////////////////////////
 // Node structure for the Red-Black Tree
 typedef struct Node {
-    int data;
+    Data* data;
     char color[6];
     struct Node *left, *right, *parent;
 } Node;
@@ -63,16 +146,12 @@ typedef struct {
  *@return negative if n1 < data
  *@return zero     if n1 = data
 */
-static int nodeCompareWithData(const Node* n1, const int data) {
-    return n1->data - data;
-}
-
-static int copyNodeData(int data) {
-    return data;
+static int nodeCompareWithData(const Node* n1, const Data* data) {
+    return strcmp(n1->data->name, data->name);
 }
 
 // Utility function to create a new node
-static Node* createNode(int data, Node* NIL) {
+static Node* createNode(Data* data, Node* NIL) {
     Node* newNode = malloc(sizeof(Node));
     newNode->data = data;
     strcpy(newNode->color, "RED");
@@ -171,14 +250,14 @@ static void fixInsert(RedBlackTree* tree, Node* k) {
 static void inorderHelper(const Node* node, Node* NIL) {
     if (node != NIL) {
         inorderHelper(node->left, NIL);
-        printf("%d ", node->data);
+        dataToString(node->data);
         inorderHelper(node->right, NIL);
     }
 }
 
 // Search helper function
-static Node* searchHelper(Node* node, int data, Node* NIL) {
-    if (node == NIL || nodeCompareWithData(node, data) == 0/*node->data == data*/) {
+static Node* searchHelper(Node* node, Data* data, Node* NIL) {
+    if (node == NIL || nodeCompareWithData(node, data) == 0) {
         return node;
     }
     if (nodeCompareWithData(node, data) > 0) {
@@ -190,7 +269,7 @@ static Node* searchHelper(Node* node, int data, Node* NIL) {
 // Constructor
 RedBlackTree* createRedBlackTree() {
     RedBlackTree* tree = malloc(sizeof(RedBlackTree));
-    tree->NIL = createNode(0, NULL);
+    tree->NIL = createNode(NULL, NULL);
     strcpy(tree->NIL->color, "BLACK");
     tree->NIL->left = tree->NIL->right = tree->NIL;
     tree->root = tree->NIL;
@@ -198,7 +277,7 @@ RedBlackTree* createRedBlackTree() {
 }
 
 // Insert function
-void insert(RedBlackTree* tree, int data) {
+void insert(RedBlackTree* tree, Data* data) {
     Node* new_node = createNode(data, tree->NIL);
 
     Node* parent = NULL;
@@ -207,7 +286,7 @@ void insert(RedBlackTree* tree, int data) {
     // BST insert
     while (current != tree->NIL) {
         parent = current;
-        if (nodeCompareWithData(current, data) > 0/*new_node->data < current->data*/) {
+        if (nodeCompareWithData(current, data) > 0) {
             current = current->left;
         }
         else {
@@ -220,7 +299,7 @@ void insert(RedBlackTree* tree, int data) {
     if (parent == NULL) {
         tree->root = new_node;
     }
-    else if (nodeCompareWithData(parent, data) > 0/*new_node->data < parent->data*/) {
+    else if (nodeCompareWithData(parent, data) > 0) {
         parent->left = new_node;
     }
     else {
@@ -245,7 +324,7 @@ void inorder(const RedBlackTree* tree) {
 }
 
 // Search function
-Node* search(const RedBlackTree* tree, int data) {
+Node* search(const RedBlackTree* tree, Data* data) {
     return searchHelper(tree->root, data, tree->NIL);
 }
 
@@ -254,6 +333,7 @@ static void freeNodes(Node* node, Node* NIL) {
     if (node != NIL) {
         freeNodes(node->left, NIL);
         freeNodes(node->right, NIL);
+        freeData(node->data);
         free(node);
     }
 }
@@ -266,57 +346,159 @@ void freeRedBlackTree(RedBlackTree* tree) {
 }
 
 #ifdef RBTREE_test
-int main() {
+void testInsertAndSearchIntFloat() {
     RedBlackTree* rbt = createRedBlackTree();
 
-    // Inserting elements
-    insert(rbt, 10);
-    insert(rbt, 20);
-    insert(rbt, 30);
-    insert(rbt, 15);
-    insert(rbt, 25);
-    insert(rbt, 5);
-    insert(rbt, 1);
+    Data* data1 = malloc(sizeof(Data));
+    data1->name = strdup("data1");
+    data1->kind = VAR;
+    data1->variable.type = malloc(sizeof(Type));
+    data1->variable.type->kind = INT;
 
-    // Inorder traversal
-    printf("Inorder traversal:\n");
-    inorder(rbt); // Expected Output: 1 5 10 15 20 25 30
-    printf("\n");
+    Data* data2 = malloc(sizeof(Data));
+    data2->name = strdup("data2");
+    data2->kind = VAR;
+    data2->variable.type = malloc(sizeof(Type));
+    data2->variable.type->kind = FLOAT;
 
-    // Search for nodes
-    printf("Search for 15: %d\n", search(rbt, 15) != rbt->NIL); // Expected Output: 1 (true)
-    printf("Search for 25: %d\n", search(rbt, 25) != rbt->NIL); // Expected Output: 1 (true)
-    printf("Search for 100: %d\n", search(rbt, 100) != rbt->NIL); // Expected Output: 0 (false)
+    insert(rbt, data1);
+    insert(rbt, data2);
 
-    // Edge cases
-    printf("Search for root (10): %d\n", search(rbt, 10) != rbt->NIL); // Expected Output: 1 (true)
-    printf("Search for minimum (1): %d\n", search(rbt, 1) != rbt->NIL); // Expected Output: 1 (true)
-    printf("Search for maximum (30): %d\n", search(rbt, 30) != rbt->NIL); // Expected Output: 1 (true)
+    Data searchData;
+    searchData.name = "data1";
+    Node* foundNode = search(rbt, &searchData);
+    assert(foundNode != rbt->NIL);
+    assert(strcmp(foundNode->data->name, "data1") == 0);
 
-    // Insert duplicate
-    insert(rbt, 10);
-    printf("Inorder traversal after inserting duplicate 10:\n");
-    inorder(rbt); // Expected Output: 1 5 10 10 15 20 25 30
-    printf("\n");
+    searchData.name = "data2";
+    foundNode = search(rbt, &searchData);
+    assert(foundNode != rbt->NIL);
+    assert(strcmp(foundNode->data->name, "data2") == 0);
 
-    // Insert more elements
-    insert(rbt, 35);
-    insert(rbt, 40);
-    insert(rbt, 50);
-    printf("Inorder traversal after inserting more elements:\n");
-    inorder(rbt); // Expected Output: 1 5 10 10 15 20 25 30 35 40 50
-    printf("\n");
-
-
-    // try and test sanitizer
-    int a[5] = {0};
-    // for (int i = 0; i < 6; ++i) {
-    for (int i = 0; i < 5; ++i) {
-        a[i] = i;
-    }
-    printf("finished\n");
+    searchData.name = "data3";
+    foundNode = search(rbt, &searchData);
+    assert(foundNode == rbt->NIL);
 
     freeRedBlackTree(rbt);
+}
+
+void testInsertAndSearchArray() {
+    RedBlackTree* rbt = createRedBlackTree();
+
+    Data* data = malloc(sizeof(Data));
+    data->name = strdup("arrayData");
+    data->kind = VAR;
+    data->variable.type = malloc(sizeof(Type));
+    data->variable.type->kind = ARRAY;
+    data->variable.type->array.elemType = malloc(sizeof(Type));
+    data->variable.type->array.elemType->kind = INT;
+    data->variable.type->array.size = 10;
+
+    insert(rbt, data);
+
+    Data searchData;
+    searchData.name = "arrayData";
+    Node* foundNode = search(rbt, &searchData);
+    assert(foundNode != rbt->NIL);
+    assert(strcmp(foundNode->data->name, "arrayData") == 0);
+
+    freeRedBlackTree(rbt);
+}
+
+void testInsertAndSearchStructure() {
+    RedBlackTree* rbt = createRedBlackTree();
+
+    Data* data = malloc(sizeof(Data));
+    data->name = strdup("structData");
+    data->kind = VAR;
+    data->variable.type = malloc(sizeof(Type));
+    data->variable.type->kind = STRUCTURE;
+
+    structFieldElement* field1 = malloc(sizeof(structFieldElement));
+    field1->name = strdup("field1");
+    field1->elemType = malloc(sizeof(Type));
+    field1->elemType->kind = INT;
+    field1->next = NULL;
+
+    structFieldElement* field2 = malloc(sizeof(structFieldElement));
+    field2->name = strdup("field2");
+    field2->elemType = malloc(sizeof(Type));
+    field2->elemType->kind = FLOAT;
+    field2->next = field1;
+
+    data->variable.type->fields = field2;
+
+    insert(rbt, data);
+
+    Data searchData;
+    searchData.name = "structData";
+    Node* foundNode = search(rbt, &searchData);
+    assert(foundNode != rbt->NIL);
+    assert(strcmp(foundNode->data->name, "structData") == 0);
+
+    freeRedBlackTree(rbt);
+}
+
+void testInsertAndSearchFunction() {
+    RedBlackTree* rbt = createRedBlackTree();
+
+    Data* data = malloc(sizeof(Data));
+    data->name = strdup("funcData");
+    data->kind = FUNC;
+    data->function.returnType = malloc(sizeof(Type));
+    data->function.returnType->kind = INT;
+    data->function.argc = 2;
+    data->function.argvTypes = malloc(2 * sizeof(Type*));
+    data->function.argvTypes[0] = malloc(sizeof(Type));
+    data->function.argvTypes[0]->kind = FLOAT;
+    data->function.argvTypes[1] = malloc(sizeof(Type));
+    data->function.argvTypes[1]->kind = INT;
+
+    insert(rbt, data);
+
+    Data searchData;
+    searchData.name = "funcData";
+    Node* foundNode = search(rbt, &searchData);
+    assert(foundNode != rbt->NIL);
+    assert(strcmp(foundNode->data->name, "funcData") == 0);
+
+    freeRedBlackTree(rbt);
+}
+
+/*
+int haha(struct_a, [float, 10])
+struct_a:
+    struct_b:
+        arrayb[int, 10]
+    arrayc[struct_c, 5]
+struct_c:
+    int a
+    int b
+*/
+void comprehendTest() {
+    RedBlackTree* rbt = createRedBlackTree();
+    Data* func_data = malloc(sizeof(Data));
+    func_data->name = strdup("haha");
+    func_data->kind = FUNC;
+    func_data->function.returnType = malloc(sizeof(Type));
+    func_data->function.returnType->kind = INT;
+    func_data->function.argc = 2;
+    func_data->function.argvTypes = malloc(2 * sizeof(Type*));
+    // todo
+}
+
+int main() {
+    testInsertAndSearchIntFloat();
+    printf("Test Insert and Search INT and FLOAT passed.\n");
+
+    testInsertAndSearchArray();
+    printf("Test Insert and Search ARRAY passed.\n");
+
+    testInsertAndSearchStructure();
+    printf("Test Insert and Search STRUCTURE passed.\n");
+
+    testInsertAndSearchFunction();
+    printf("Test Insert and Search FUNCTION passed.\n");
 
     return 0;
 }
