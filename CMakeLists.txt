@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.20)
 project(Compiler LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 
-option(PARSE_TREE_TEST "test PARSE TREE date structure" OFF)
+option(PARSE_TREE_TEST "test PARSE TREE date structure" ON)
 option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF)
 option(RBTREE_TEST "test red black tree" ON)
 option(SYMBOL_TEST "test symbol table" ON)

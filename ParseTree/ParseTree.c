@@ -1,29 +1,14 @@
+#include "ParseTree.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "ParseTree.h"
+
+#include <assert.h>
 
 #define THRESHOLD 0.75
 
 // the definition of root.
 ParseTNode* root = NULL;
-
-// Function to duplicate a string
-char* my_strdup(const char* src) {
-    if (src == NULL) {
-        return NULL;
-    }
-    // Allocate memory for the new string
-    char* dest = (char*)malloc(strlen(src) + 1);
-    if (dest == NULL) {
-        perror("fail to allocate memory in {my_strdup}.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    // Copy the contents of the source string to the destination string
-    strcpy(dest, src);
-    return dest;
-}
 
 // Array List functions
 static int initArrayList(ArrayList* list) {
@@ -192,32 +177,82 @@ void cleanParseTree() {
     freeParseTNode(root);
 }
 
+/**
+ * @brief compare expression's own name or its children name with the given text
+ * @param node the parse tree node to be compared
+ * @param text the name or expression string as comparison target
+ * @return 1 if equal; 0 not equal
+*/
+int nodeChildrenNameEqualHelper(const ParseTNode* node, const char* text) {
+    assert(node != NULL);
+    // compare with children names
+    char* text_copy = my_strdup(text);
+    const char* delim = " ";
+    const char* t = strtok(text_copy, delim);
+    int i = 0;
+    while (t != NULL) {
+        if (i >= node->children.num) {
+            // text_copy is longer than node's children names
+            free(text_copy);
+            return 0;
+        }
+        const char* child_name = node->children.container[i]->name;
+        if (strcmp(child_name, t) != 0) {
+            // mismatch word
+            free(text_copy);
+            return 0;
+        }
+        t = strtok(NULL, delim);
+        i++;
+    }
+    free(text_copy);
+    // check whether text is shorter than node's children names or not
+    return i == node->children.num;
+}
+
+// Function to duplicate a string
+char* my_strdup(const char* src) {
+    if (src == NULL) {
+        return NULL;
+    }
+    // Allocate memory for the new string
+    char* dest = malloc(strlen(src) + 1);
+    if (dest == NULL) {
+        perror("fail to allocate memory in {my_strdup}.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Copy the contents of the source string to the destination string
+    strcpy(dest, src);
+    return dest;
+}
+
 //////test code/////////////////////////////////////////////
 #ifdef PARSE_TREE_test
-int main(int argc, char const *argv[]) {
+int main(int argc, char const* argv[]) {
     // Test 1: Create a simple ParseTree with a root and two children
-    ParseTNode *root = createParseTNode("root", 1, 0);
-    ParseTNode *child1 = createParseTNode("child1", 2, 0);
-    ParseTNode *child2 = createParseTNode("child2", 3, 0);
+    ParseTNode* root = createParseTNode("root", 1, 0);
+    ParseTNode* child1 = createParseTNode("child1", 2, 0);
+    ParseTNode* child2 = createParseTNode("child2", 3, 0);
     addChild(root, child1);
     addChild(root, child2);
 
-    ParseTNode *child3 = createParseTNode("SEMI", 4, 1);
-    ParseTNode *child4 = createParseTNode("COMMA", 5, 1);
+    ParseTNode* child3 = createParseTNode("SEMI", 4, 1);
+    ParseTNode* child4 = createParseTNode("COMMA", 5, 1);
     addChild(root, child3);
     addChild(child1, child4);
 
     ValueUnion value = {.int_value = 3};
-    ParseTNode *int_child = createParseTNodeWithValue("INT", 6, value);
+    ParseTNode* int_child = createParseTNodeWithValue("INT", 6, value);
 
     ValueUnion value1 = {.str_value = "hello, wo!"};
-    ParseTNode *id_child = createParseTNodeWithValue("ID", 7, value1);
+    ParseTNode* id_child = createParseTNodeWithValue("ID", 7, value1);
 
     ValueUnion value3 = {.float_value = 3.01};
-    ParseTNode *float_child = createParseTNodeWithValue("FLOAT", 8, value3);
+    ParseTNode* float_child = createParseTNodeWithValue("FLOAT", 8, value3);
 
     ValueUnion value4 = {.str_value = "int"};
-    ParseTNode *type_child = createParseTNodeWithValue("TYPE", 9, value4);
+    ParseTNode* type_child = createParseTNodeWithValue("TYPE", 9, value4);
 
     addChild(child4, int_child);
     addChild(child4, id_child);
@@ -226,8 +261,37 @@ int main(int argc, char const *argv[]) {
 
     printf("Test 1: Simple Parse Tree\n");
     printParseTree(root);
-    freeParseTNode(root);
+    assert(exprNameEqualHelper(root,"root",0));
+    printf("assert 1 passed\n");
 
+    assert(exprNameEqualHelper(root,"child1 child2 SEMI",1));
+    printf("assert 2 passed\n");
+
+    assert(!exprNameEqualHelper(root,"child1 child SEMI",1));
+    printf("assert 3 passed\n");
+
+    assert(!exprNameEqualHelper(root,"child1 child2 SEMI se se",1));
+    printf("assert 4 passed\n");
+
+    assert(!exprNameEqualHelper(root,"child1 child2",1));
+    printf("assert 5 passed\n");
+
+    assert(exprNameEqualHelper(root,"child1 child2 SEMI  ",1));
+    printf("assert 6 passed\n");
+
+    assert(exprNameEqualHelper(child1,"child1",0));
+    printf("assert 7 passed\n");
+
+    assert(!exprNameEqualHelper(child1,"child1",1));
+    printf("assert 8 passed\n");
+
+    assert(!exprNameEqualHelper(child1,"",1));
+    printf("assert 9 passed\n");
+
+    assert(exprNameEqualHelper(child3,"",1));
+    printf("assert 10 passed\n");
+
+    freeParseTNode(root);
     return 0;
 }
 #endif

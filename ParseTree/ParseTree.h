@@ -35,5 +35,9 @@ void freeParseTNode(ParseTNode* node);
 void printParseTree(const ParseTNode* root);
 void printParseTRoot();
 void cleanParseTree();
+int nodeChildrenNameEqualHelper(const ParseTNode* node, const char* text);
+
+// utility function
+char* my_strdup(const char* src);
 
 #endif // PARSE_TREE
