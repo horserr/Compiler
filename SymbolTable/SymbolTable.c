@@ -25,13 +25,14 @@ void resolverHelper(const ParseTNode* parent_node, const char* expr) {
     int i = 0;
     while (e != NULL) {
         const ParseTNode* node = parent_node->children.container[i];
-
         const ResolvePtr f = lookUpFunction(e);
         if (f == NULL) {
             fprintf(stderr, "Invalid expression name \"%s\" {SymbolTable.c resolver}.\n", e);
             exit(EXIT_FAILURE);
         }
-        f(node);
+
+        // default argument for option is null
+        f(node, NULL);
         e = strtok(NULL, delim);
         i++;
     }
@@ -39,7 +40,10 @@ void resolverHelper(const ParseTNode* parent_node, const char* expr) {
     assert(i==parent_node->children.num);
 }
 
-void resolver(const ParseTNode* node, const char* expressions[], const int length) {
+/**
+ * @return the index of expr fitted in expressions
+*/
+int resolver(const ParseTNode* node, const char* expressions[], const int length) {
     int i = 0;
     while (i < length) {
         if (nodeChildrenNameEqualHelper(node, expressions[i])) {
@@ -55,17 +59,19 @@ void resolver(const ParseTNode* node, const char* expressions[], const int lengt
         }
         exit(EXIT_FAILURE);
     }
+    return i;
 }
 
-void resolveArgs(const ParseTNode* node) {
+void* resolveArgs(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Exp COMMA Args",
         "Exp"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveExp(const ParseTNode* node) {
+void* resolveExp(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Exp ASSIGNOP Exp",
         "Exp AND Exp",
@@ -87,40 +93,49 @@ void resolveExp(const ParseTNode* node) {
         "FLOAT"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveDec(const ParseTNode* node) {
+void* resolveDec(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "VarDec",
         "VarDec ASSIGNOP Exp"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveDecList(const ParseTNode* node) {
+void* resolveDecList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Dec",
         "Dec COMMA DecList"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveDef(const ParseTNode* node) {
+void* resolveDef(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Specifier DecList SEMI"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    /*
+    Type* type = resolveSpecifier(node);
+    resolveDecList(node, type);
+    */
+    return NULL;
 }
 
-void resolveDefList(const ParseTNode* node) {
+void* resolveDefList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "",
         "Def DefList"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveStmt(const ParseTNode* node) {
+void* resolveStmt(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Exp SEMI",
         "CompSt",
@@ -130,108 +145,122 @@ void resolveStmt(const ParseTNode* node) {
         "WHILE LP Exp RP Stmt"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveStmtList(const ParseTNode* node) {
+void* resolveStmtList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "",
         "Stmt StmtList"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveCompSt(const ParseTNode* node) {
+void* resolveCompSt(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "LC DefList StmtList RC"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveParamDec(const ParseTNode* node) {
+void* resolveParamDec(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Specifier VarDec"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveVarList(const ParseTNode* node) {
+void* resolveVarList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "ParamDec COMMA VarList",
         "ParamDec"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveFunDec(const ParseTNode* node) {
+void* resolveFunDec(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "ID LP VarList RP",
         "ID LP RP"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveVarDec(const ParseTNode* node) {
+void* resolveVarDec(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "ID",
         "VarDec LB INT RB"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveTag(const ParseTNode* node) {
+void* resolveTag(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "ID"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveOptTag(const ParseTNode* node) {
+void* resolveOptTag(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "",
         "ID"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveStructSpecifier(const ParseTNode* node) {
+void* resolveStructSpecifier(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "STRUCT OptTag LC DefList RC",
         "STRUCT Tag"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveSpecifier(const ParseTNode* node) {
+void* resolveSpecifier(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "TYPE",
         "StructSpecifier"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveExtDecList(const ParseTNode* node) {
+void* resolveExtDecList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "VarDec",
         "VarDec COMMA ExtDecList"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveExtDef(const ParseTNode* node) {
+void* resolveExtDef(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Specifier ExtDecList SEMI",
         "Specifier SEMI",
         "Specifier FunDec CompSt"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
-void resolveExtDefList(const ParseTNode* node) {
+void* resolveExtDefList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "",
         "ExtDef ExtDefList"
     };
     resolver(node, expressions, ARRAY_LEN(expressions));
+    return NULL;
 }
 
 
