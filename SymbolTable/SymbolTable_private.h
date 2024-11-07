@@ -4,9 +4,11 @@
 #include "RBTree.h"
 #include "SymbolTable.h"
 
+typedef void (*ResolvePtr)(const ParseTNode*);
+
 typedef struct {
     char* expr;
-    void (*func)(const ParseTNode*);
+    ResolvePtr func;
 } ExprFuncPair;
 
 void resolveArgs(const ParseTNode* node);

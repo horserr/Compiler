@@ -6,6 +6,16 @@
 
 RedBlackTree* Map = NULL;
 
+ResolvePtr lookUpFunction(const char* expression) {
+    for (int i = 0; i < ARRAY_LEN(exprFuncLookUpTable); ++i) {
+        const ExprFuncPair pair = exprFuncLookUpTable[i];
+        if (strcmp(pair.expr, expression) == 0) {
+            return pair.func;
+        }
+    }
+    return NULL;
+}
+
 void resolverHelper(const ParseTNode* parent_node, const char* expr) {
     char* expr_copy = my_strdup(expr);
     const char* delim = " ";
@@ -14,21 +24,12 @@ void resolverHelper(const ParseTNode* parent_node, const char* expr) {
     while (e != NULL) {
         const ParseTNode* node = parent_node->children.container[i];
 
-        // look up function and call it
-        int j = 0;
-        while (j < ARRAY_LEN(exprFuncLookUpTable)) {
-            const ExprFuncPair pair = exprFuncLookUpTable[j];
-            if (strcmp(e, pair.expr) == 0) {
-                pair.func(node);
-                break;
-            }
-            j++;
-        }
-
-        if (j == ARRAY_LEN(exprFuncLookUpTable)) {
-            fprintf(stderr, "Invalid expression name %s {SymbolTable.c resolver}.\n", e);
+        const ResolvePtr f = lookUpFunction(e);
+        if (f == NULL) {
+            fprintf(stderr, "Invalid expression name \"%s\" {SymbolTable.c resolver}.\n", e);
             exit(EXIT_FAILURE);
         }
+        f(node);
         e = strtok(NULL, delim);
         i++;
     }
@@ -244,27 +245,173 @@ void buildTable(const ParseTNode* root) {
 
 #ifdef SYMBOL_test
 int main() {
-    // todo header file structure for parseTNode
-    /*
-     *  Program
-            |   ExtDefList
-                    |   ExtDef
-                    |   ExtDefList
-                            |   ExtDef
-                            |   ExtDefList
-    */
+    // NOTE: incomplete test case
+    // Create the root node
     ParseTNode* root = createParseTNode("Program", 1, 0);
-    ParseTNode* child1 = createParseTNode("ExtDefList", 1, 0);
-    ParseTNode* child1_1 = createParseTNode("ExtDef", 1, 0);
-    ParseTNode* child1_2 = createParseTNode("ExtDefList", 1, 0);
-    ParseTNode* child1_2_1 = createParseTNode("ExtDef", 1, 0);
-    ParseTNode* child1_2_2 = createParseTNode("ExtDefList", 1, 0);
-    addChild(root, child1);
-    addChild(child1, child1_1);
-    addChild(child1, child1_2);
-    addChild(child1_2, child1_2_1);
-    addChild(child1_2, child1_2_2);
+
+    // Create ExtDefList node
+    ParseTNode* extDefList = createParseTNode("ExtDefList", 1, 0);
+    addChild(root, extDefList);
+
+    // Create ExtDef node
+    ParseTNode* extDef = createParseTNode("ExtDef", 1, 0);
+    addChild(extDefList, extDef);
+
+    ParseTNode* extDefList1 = createParseTNode("ExtDefList", 1, 0);
+    addChild(extDefList, extDefList1);
+
+    // Create Specifier node
+    ParseTNode* specifier = createParseTNode("Specifier", 1, 0);
+    addChild(extDef, specifier);
+
+    // Create TYPE node with value
+    ValueUnion typeValue;
+    typeValue.str_value = "int";
+    ParseTNode* type = createParseTNodeWithValue("TYPE", 1, typeValue);
+    addChild(specifier, type);
+
+    // Create FunDec node
+    ParseTNode* funDec = createParseTNode("FunDec", 1, 0);
+    addChild(extDef, funDec);
+
+    // Create ID node with value
+    ValueUnion idValue;
+    idValue.str_value = "main";
+    ParseTNode* id = createParseTNodeWithValue("ID", 1, idValue);
+    addChild(funDec, id);
+
+    // Create LP and RP nodes
+    ParseTNode* lp = createParseTNode("LP", 1, 1);
+    ParseTNode* rp = createParseTNode("RP", 1, 1);
+    addChild(funDec, lp);
+    addChild(funDec, rp);
+
+    // Create CompSt node
+    ParseTNode* compSt = createParseTNode("CompSt", 2, 0);
+    addChild(extDef, compSt);
+
+    // Create LC node
+    ParseTNode* lc = createParseTNode("LC", 2, 1);
+    addChild(compSt, lc);
+
+    // Create DefList node
+    ParseTNode* defList = createParseTNode("DefList", 3, 0);
+    addChild(compSt, defList);
+
+    // Create Def node
+    ParseTNode* def = createParseTNode("Def", 3, 0);
+    addChild(defList, def);
+
+    // Create Specifier node for Def
+    ParseTNode* defSpecifier = createParseTNode("Specifier", 3, 0);
+    addChild(def, defSpecifier);
+
+    // Create TYPE node with value for Def
+    ParseTNode* defType = createParseTNodeWithValue("TYPE", 3, typeValue);
+    addChild(defSpecifier, defType);
+
+    // Create DecList node
+    ParseTNode* decList = createParseTNode("DecList", 3, 0);
+    addChild(def, decList);
+
+    // Create Dec node
+    ParseTNode* dec = createParseTNode("Dec", 3, 0);
+    addChild(decList, dec);
+
+    // Create VarDec node
+    ParseTNode* varDec = createParseTNode("VarDec", 3, 0);
+    addChild(dec, varDec);
+
+    // Create ID node with value for VarDec
+    ValueUnion varIdValue;
+    varIdValue.str_value = "i";
+    ParseTNode* varId = createParseTNodeWithValue("ID", 3, varIdValue);
+    addChild(varDec, varId);
+
+    // Create ASSIGNOP node
+    ParseTNode* assignop = createParseTNode("ASSIGNOP", 3, 1);
+    addChild(dec, assignop);
+
+    // Create Exp node
+    ParseTNode* exp = createParseTNode("Exp", 3, 0);
+    addChild(dec, exp);
+
+    // Create INT node with value
+    ValueUnion intValue;
+    intValue.int_value = 0;
+    ParseTNode* intNode = createParseTNodeWithValue("INT", 3, intValue);
+    addChild(exp, intNode);
+
+    // Create SEMI node
+    ParseTNode* semi = createParseTNode("SEMI", 3, 1);
+    addChild(def, semi);
+
+    // Create StmtList node
+    ParseTNode* stmtList = createParseTNode("StmtList", 4, 0);
+    addChild(compSt, stmtList);
+
+    // Create Stmt node
+    ParseTNode* stmt = createParseTNode("Stmt", 4, 0);
+    addChild(stmtList, stmt);
+
+    // Create Exp node for Stmt
+    ParseTNode* stmtExp = createParseTNode("Exp", 4, 0);
+    addChild(stmt, stmtExp);
+
+    // Create Exp node for ID
+    ParseTNode* idExp = createParseTNode("Exp", 4, 0);
+    addChild(stmtExp, idExp);
+
+    // Create ID node with value for Exp
+    ValueUnion jValue;
+    jValue.str_value = "j";
+    ParseTNode* jId = createParseTNodeWithValue("ID", 4, jValue);
+    addChild(idExp, jId);
+
+    // Create ASSIGNOP node for Stmt
+    ParseTNode* stmtAssignop = createParseTNode("ASSIGNOP", 4, 1);
+    addChild(stmtExp, stmtAssignop);
+
+    // Create Exp node for assignment
+    ParseTNode* assignExp = createParseTNode("Exp", 4, 0);
+    addChild(stmtExp, assignExp);
+
+    // Create Exp node for ID i
+    ParseTNode* iExp = createParseTNode("Exp", 4, 0);
+    addChild(assignExp, iExp);
+
+    // Create ID node with value for Exp
+    ValueUnion iValue;
+    iValue.str_value = "i";
+    ParseTNode* iId = createParseTNodeWithValue("ID", 4, iValue);
+    addChild(iExp, iId);
+
+    // Create PLUS node
+    ParseTNode* plus = createParseTNode("PLUS", 4, 1);
+    addChild(assignExp, plus);
+
+    // Create Exp node for INT 1
+    ParseTNode* intExp = createParseTNode("Exp", 4, 0);
+    addChild(assignExp, intExp);
+
+    // Create INT node with value 1
+    ValueUnion oneValue;
+    oneValue.int_value = 1;
+    ParseTNode* oneInt = createParseTNodeWithValue("INT", 4, oneValue);
+    addChild(intExp, oneInt);
+
+    // Create SEMI node for Stmt
+    ParseTNode* stmtSemi = createParseTNode("SEMI", 4, 1);
+    addChild(stmt, stmtSemi);
+
+    // Create RC node
+    ParseTNode* rc = createParseTNode("RC", 2, 1);
+    addChild(compSt, rc);
+
+    // Build the symbol table
     buildTable(root);
+
+    // Free the parse tree
     freeParseTNode(root);
 }
 #endif
