@@ -1,7 +1,6 @@
 #ifndef SYMBOL_TABLE_PRIVATE
 #define SYMBOL_TABLE_PRIVATE
 
-#include "RBTree.h"
 #include "SymbolTable.h"
 
 typedef void (*ResolvePtr)(const ParseTNode*);

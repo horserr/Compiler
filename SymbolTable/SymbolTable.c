@@ -1,10 +1,12 @@
 #include <assert.h>
 #include <stdio.h>
+#include "Environment.h"
 #include "SymbolTable_private.h"
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
-RedBlackTree* Map = NULL;
+Environment* globalEnv = NULL;
+Environment* currentEnv = NULL;
 
 ResolvePtr lookUpFunction(const char* expression) {
     for (int i = 0; i < ARRAY_LEN(exprFuncLookUpTable); ++i) {
@@ -238,9 +240,9 @@ void buildTable(const ParseTNode* root) {
     char* expressions[] = {
         "ExtDefList"
     };
-    // Map = createRedBlackTree();
+    globalEnv = currentEnv = newEnvironment(NULL);
     resolver(root, expressions,ARRAY_LEN(expressions));
-    // freeRedBlackTree(Map);
+    freeEnvironment(globalEnv);
 }
 
 #ifdef SYMBOL_test
