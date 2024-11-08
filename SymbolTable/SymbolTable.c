@@ -18,7 +18,7 @@ ResolvePtr lookUpFunction(const char* expression) {
     return NULL;
 }
 
-void resolverHelper(const ParseTNode* parent_node, const char* expr) {
+void resolver(const ParseTNode* parent_node, const char* expr) {
     char* expr_copy = my_strdup(expr);
     const char* delim = " ";
     const char* e = strtok(expr_copy, delim);
@@ -43,11 +43,11 @@ void resolverHelper(const ParseTNode* parent_node, const char* expr) {
 /**
  * @return the index of expr fitted in expressions
 */
-int resolver(const ParseTNode* node, const char* expressions[], const int length) {
+__attribute__((warn_unused_result))
+int matchExprPattern(const ParseTNode* node, const char* expressions[], const int length) {
     int i = 0;
     while (i < length) {
         if (nodeChildrenNameEqualHelper(node, expressions[i])) {
-            resolverHelper(node, expressions[i]);
             break;
         }
         i++;
@@ -67,7 +67,8 @@ void* resolveArgs(const ParseTNode* node, void* opt) {
         "Exp COMMA Args",
         "Exp"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -86,13 +87,12 @@ void* resolveExp(const ParseTNode* node, void* opt) {
         "NOT Exp",
         "ID LP Args RP",
         "ID LP RP",
-        "Exp LB Exp RB",
-        "Exp DOT ID",
         "ID",
         "INT",
         "FLOAT"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -101,7 +101,8 @@ void* resolveDec(const ParseTNode* node, void* opt) {
         "VarDec",
         "VarDec ASSIGNOP Exp"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -110,7 +111,8 @@ void* resolveDecList(const ParseTNode* node, void* opt) {
         "Dec",
         "Dec COMMA DecList"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -118,20 +120,18 @@ void* resolveDef(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Specifier DecList SEMI"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
-    /*
-    Type* type = resolveSpecifier(node);
-    resolveDecList(node, type);
-    */
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
 void* resolveDefList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
-        "",
+        "Def",
         "Def DefList"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -144,16 +144,18 @@ void* resolveStmt(const ParseTNode* node, void* opt) {
         "IF LP Exp RP Stmt ELSE Stmt",
         "WHILE LP Exp RP Stmt"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
 void* resolveStmtList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
-        "",
+        "Stmt",
         "Stmt StmtList"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -161,7 +163,8 @@ void* resolveCompSt(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "LC DefList StmtList RC"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -169,16 +172,18 @@ void* resolveParamDec(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "Specifier VarDec"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
 void* resolveVarList(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
-        "ParamDec COMMA VarList",
-        "ParamDec"
+        "ParamDec",
+        "ParamDec COMMA VarList"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -187,7 +192,8 @@ void* resolveFunDec(const ParseTNode* node, void* opt) {
         "ID LP VarList RP",
         "ID LP RP"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -196,7 +202,8 @@ void* resolveVarDec(const ParseTNode* node, void* opt) {
         "ID",
         "VarDec LB INT RB"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -204,7 +211,8 @@ void* resolveTag(const ParseTNode* node, void* opt) {
     const char* expressions[] = {
         "ID"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -213,7 +221,8 @@ void* resolveOptTag(const ParseTNode* node, void* opt) {
         "",
         "ID"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -222,7 +231,8 @@ void* resolveStructSpecifier(const ParseTNode* node, void* opt) {
         "STRUCT OptTag LC DefList RC",
         "STRUCT Tag"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -231,7 +241,8 @@ void* resolveSpecifier(const ParseTNode* node, void* opt) {
         "TYPE",
         "StructSpecifier"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -240,7 +251,8 @@ void* resolveExtDecList(const ParseTNode* node, void* opt) {
         "VarDec",
         "VarDec COMMA ExtDecList"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -250,7 +262,8 @@ void* resolveExtDef(const ParseTNode* node, void* opt) {
         "Specifier SEMI",
         "Specifier FunDec CompSt"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -259,7 +272,8 @@ void* resolveExtDefList(const ParseTNode* node, void* opt) {
         "",
         "ExtDef ExtDefList"
     };
-    resolver(node, expressions, ARRAY_LEN(expressions));
+    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    resolver(node, expressions[i]);
     return NULL;
 }
 
@@ -270,7 +284,8 @@ void buildTable(const ParseTNode* root) {
         "ExtDefList"
     };
     globalEnv = currentEnv = newEnvironment(NULL);
-    resolver(root, expressions,ARRAY_LEN(expressions));
+    const int i = matchExprPattern(root, expressions,ARRAY_LEN(expressions));
+    resolver(root,expressions[i]);
     freeEnvironment(globalEnv);
 }
 
