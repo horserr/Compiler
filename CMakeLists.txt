@@ -2,11 +2,11 @@ cmake_minimum_required(VERSION 3.20)
 project(Compiler LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 
+ADD_COMPILE_DEFINITIONS("LOCAL")
 option(PARSE_TREE_TEST "test PARSE TREE date structure" ON)
 option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF)
 option(RBTREE_TEST "test red black tree" ON)
 option(SYMBOL_TEST "test symbol table" ON)
-ADD_COMPILE_DEFINITIONS("LOCAL")
 
 # todo add sanitizer flags in debug mode and git
 # Set sanitizer flags
@@ -24,6 +24,7 @@ set(ASAN_OPTIONS_LIST
 )
 
 # Add subdirectories
+add_subdirectory(utils)
 add_subdirectory(ParseTree)
 add_subdirectory(SymbolTable)
 
@@ -64,9 +65,9 @@ add_executable(${PROJECT_NAME}
         ${BISON_Parser_OUTPUTS}
 )
 target_link_libraries(${PROJECT_NAME}
-        PARSE_TREE SymbolTable
+        SymbolTable
         ${FLEX_LIBRARIES}
         ${BISON_LIBRARIES}
         sanitizer_flags
 )
-
+# note: remember to change the current working directory to project root in clion

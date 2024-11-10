@@ -1,9 +1,9 @@
 #include "ParseTree.h"
+#include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <assert.h>
+#include "../utils/utils.h"
 
 #define THRESHOLD 0.75
 
@@ -82,14 +82,11 @@ ParseTNode* createParseTNode(const char* name, const int lineNum, const int flag
 static void copyValueUnion(ValueUnion* dest, const ValueUnion* src, const char* type) {
     if (strcmp(type, "id") == 0) {
         dest->str_value = my_strdup(src->str_value);
-    }
-    else if (strcmp(type, "int") == 0) {
+    } else if (strcmp(type, "int") == 0) {
         dest->int_value = src->int_value;
-    }
-    else if (strcmp(type, "float") == 0) {
+    } else if (strcmp(type, "float") == 0) {
         dest->float_value = src->float_value;
-    }
-    else {
+    } else {
         fprintf(stderr, "unknown type %s in {ParseTree.c copyValueUnion}\n", type);
         exit(EXIT_FAILURE);
     }
@@ -100,11 +97,9 @@ ParseTNode* createParseTNodeWithValue(const char* name, const int lineNum, const
     ParseTNode* node = createParseTNode(name, lineNum, 1);
     if (strcmp(name, "INT") == 0) {
         copyValueUnion(&node->value, &value, "int");
-    }
-    else if (strcmp(name, "FLOAT") == 0) {
+    } else if (strcmp(name, "FLOAT") == 0) {
         copyValueUnion(&node->value, &value, "float");
-    }
-    else if (strcmp(name, "ID") == 0 || strcmp(name, "TYPE") == 0) {
+    } else if (strcmp(name, "ID") == 0 || strcmp(name, "TYPE") == 0) {
         copyValueUnion(&node->value, &value, "id");
     }
     return node;
@@ -138,11 +133,9 @@ static void print(const ParseTNode* root, const int level) {
         printf("%*s%s", level * 2, "", root->name);
         if (strcmp(root->name, "INT") == 0) {
             printf(": %d", root->value.int_value);
-        }
-        else if (strcmp(root->name, "FLOAT") == 0) {
+        } else if (strcmp(root->name, "FLOAT") == 0) {
             printf(": %f", root->value.float_value);
-        }
-        else if (strcmp(root->name, "TYPE") == 0 || strcmp(root->name, "ID") == 0) {
+        } else if (strcmp(root->name, "TYPE") == 0 || strcmp(root->name, "ID") == 0) {
             printf(": %s", root->value.str_value);
         }
         printf("\n");
@@ -210,88 +203,49 @@ int nodeChildrenNameEqualHelper(const ParseTNode* node, const char* text) {
     return i == node->children.num;
 }
 
-// Function to duplicate a string
-char* my_strdup(const char* src) {
-    if (src == NULL) {
-        return NULL;
+/**
+ *  @brief get the child node by its name
+ *  @return child node if found; else error occurred
+*/
+ParseTNode* getChildByName(const ParseTNode* parent, const char* name) {
+    assert(parent != NULL);
+    for (int i = 0; i < parent->children.num; ++i) {
+        ParseTNode* child = parent->children.container[i];
+        if (strcmp(child->name, name) == 0) {
+            return child;
+        }
     }
-    // Allocate memory for the new string
-    char* dest = malloc(strlen(src) + 1);
-    if (dest == NULL) {
-        perror("fail to allocate memory in {my_strdup}.\n");
+    fprintf(stderr, "Wrong child name: %s. The parent node is %s\n."
+            " Checking from {ParseTree.c getChildByName}.\n",
+            name, parent->name);
+    exit(EXIT_FAILURE);
+}
+
+/**
+ * @brief find which kind of expression the node's children match
+ * @return if found, return the index of expr fitted in expressions; else error occurred
+*/
+int matchExprPattern(const ParseTNode* node, const char* expressions[], const int length) {
+    int i = 0;
+    while (i < length) {
+        if (nodeChildrenNameEqualHelper(node, expressions[i])) {
+            break;
+        }
+        i++;
+    }
+    if (i == length) {
+        perror("There must be a typo in expression list. Checking from {SymbolTable.c resolver}\n");
+        for (int j = 0; j < length; ++j) {
+            fprintf(stderr, "<%02d.>\t%s\n", j, expressions[j]);
+        }
         exit(EXIT_FAILURE);
     }
-
-    // Copy the contents of the source string to the destination string
-    strcpy(dest, src);
-    return dest;
+    return i;
 }
+
 
 //////test code/////////////////////////////////////////////
 #ifdef PARSE_TREE_test
 int main(int argc, char const* argv[]) {
-    // Test 1: Create a simple ParseTree with a root and two children
-    ParseTNode* root = createParseTNode("root", 1, 0);
-    ParseTNode* child1 = createParseTNode("child1", 2, 0);
-    ParseTNode* child2 = createParseTNode("child2", 3, 0);
-    addChild(root, child1);
-    addChild(root, child2);
-
-    ParseTNode* child3 = createParseTNode("SEMI", 4, 1);
-    ParseTNode* child4 = createParseTNode("COMMA", 5, 1);
-    addChild(root, child3);
-    addChild(child1, child4);
-
-    ValueUnion value = {.int_value = 3};
-    ParseTNode* int_child = createParseTNodeWithValue("INT", 6, value);
-
-    ValueUnion value1 = {.str_value = "hello, wo!"};
-    ParseTNode* id_child = createParseTNodeWithValue("ID", 7, value1);
-
-    ValueUnion value3 = {.float_value = 3.01};
-    ParseTNode* float_child = createParseTNodeWithValue("FLOAT", 8, value3);
-
-    ValueUnion value4 = {.str_value = "int"};
-    ParseTNode* type_child = createParseTNodeWithValue("TYPE", 9, value4);
-
-    addChild(child4, int_child);
-    addChild(child4, id_child);
-    addChild(child2, float_child);
-    addChild(child2, type_child);
-
-    printf("Test 1: Simple Parse Tree\n");
-    printParseTree(root);
-    assert(exprNameEqualHelper(root,"root",0));
-    printf("assert 1 passed\n");
-
-    assert(exprNameEqualHelper(root,"child1 child2 SEMI",1));
-    printf("assert 2 passed\n");
-
-    assert(!exprNameEqualHelper(root,"child1 child SEMI",1));
-    printf("assert 3 passed\n");
-
-    assert(!exprNameEqualHelper(root,"child1 child2 SEMI se se",1));
-    printf("assert 4 passed\n");
-
-    assert(!exprNameEqualHelper(root,"child1 child2",1));
-    printf("assert 5 passed\n");
-
-    assert(exprNameEqualHelper(root,"child1 child2 SEMI  ",1));
-    printf("assert 6 passed\n");
-
-    assert(exprNameEqualHelper(child1,"child1",0));
-    printf("assert 7 passed\n");
-
-    assert(!exprNameEqualHelper(child1,"child1",1));
-    printf("assert 8 passed\n");
-
-    assert(!exprNameEqualHelper(child1,"",1));
-    printf("assert 9 passed\n");
-
-    assert(exprNameEqualHelper(child3,"",1));
-    printf("assert 10 passed\n");
-
-    freeParseTNode(root);
-    return 0;
 }
 #endif

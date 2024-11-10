@@ -10,12 +10,16 @@ typedef struct RedBlackTree RedBlackTree;
 // function declaration
 RedBlackTree* createRedBlackTree();
 void insert(RedBlackTree* tree, Data* data);
-const Data* searchWithName(const RedBlackTree* tree, char* name);
+const Data* searchWithName(const RedBlackTree* tree, const char* name);
 void freeRedBlackTree(RedBlackTree* tree);
 // debug utilities
 void typeToString(Type* t);
 void dataToString(Data* d);
 void inorder(const RedBlackTree* tree);
+
+// utility function
+void freeType(Type* t);
+Type* deepCopyType(const Type* src);
 
 // type definition
 struct structFieldElement {
@@ -25,7 +29,7 @@ struct structFieldElement {
 };
 
 struct Type {
-    enum { INT, FLOAT, ARRAY, STRUCTURE } kind;
+    enum { INT, FLOAT, ARRAY, STRUCT } kind;
 
     union {
         // array needs element type and size
@@ -34,8 +38,10 @@ struct Type {
             int size;
         } array;
 
-        // structure needs a list of fields
-        structFieldElement* fields;
+        struct {
+            char* struct_name;
+            structFieldElement* fields;
+        } structure;
     };
 };
 

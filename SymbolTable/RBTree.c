@@ -6,11 +6,12 @@ This code is provided by @author costheta_z
 **/
 #include "RBTree.h"
 #include <assert.h>
+#include <ParseTree.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "../utils/utils.h"
 
-static void freeType(Type* t);
 
 ///// Red Black Tree /////////////////////////////////////////
 // Node structure for the Red-Black Tree
@@ -56,11 +57,9 @@ static void leftRotate(RedBlackTree* tree, Node* x) {
     y->parent = x->parent;
     if (x->parent == NULL) {
         tree->root = y;
-    }
-    else if (x == x->parent->left) {
+    } else if (x == x->parent->left) {
         x->parent->left = y;
-    }
-    else {
+    } else {
         x->parent->right = y;
     }
     y->left = x;
@@ -77,11 +76,9 @@ static void rightRotate(RedBlackTree* tree, Node* x) {
     y->parent = x->parent;
     if (x->parent == NULL) {
         tree->root = y;
-    }
-    else if (x == x->parent->right) {
+    } else if (x == x->parent->right) {
         x->parent->right = y;
-    }
-    else {
+    } else {
         x->parent->left = y;
     }
     y->right = x;
@@ -98,8 +95,7 @@ static void fixInsert(RedBlackTree* tree, Node* k) {
                 strcpy(u->color, "BLACK");
                 strcpy(k->parent->parent->color, "RED");
                 k = k->parent->parent;
-            }
-            else {
+            } else {
                 if (k == k->parent->right) {
                     k = k->parent;
                     leftRotate(tree, k);
@@ -108,16 +104,14 @@ static void fixInsert(RedBlackTree* tree, Node* k) {
                 strcpy(k->parent->parent->color, "RED");
                 rightRotate(tree, k->parent->parent);
             }
-        }
-        else {
+        } else {
             Node* u = k->parent->parent->left; // uncle
             if (strcmp(u->color, "RED") == 0) {
                 strcpy(k->parent->color, "BLACK");
                 strcpy(u->color, "BLACK");
                 strcpy(k->parent->parent->color, "RED");
                 k = k->parent->parent;
-            }
-            else {
+            } else {
                 if (k == k->parent->left) {
                     k = k->parent;
                     rightRotate(tree, k);
@@ -161,7 +155,10 @@ RedBlackTree* createRedBlackTree() {
     return tree;
 }
 
-// Insert function
+/**
+ * @brief insert data to the red black tree
+ * @note data is not deep copied. Instead, simply pointing to it.
+*/
 void insert(RedBlackTree* tree, Data* data) {
     Node* new_node = createNode(data, tree->NIL);
 
@@ -173,8 +170,7 @@ void insert(RedBlackTree* tree, Data* data) {
         parent = current;
         if (nodeCompareWithData(current, data) > 0) {
             current = current->left;
-        }
-        else {
+        } else {
             current = current->right;
         }
     }
@@ -183,11 +179,9 @@ void insert(RedBlackTree* tree, Data* data) {
 
     if (parent == NULL) {
         tree->root = new_node;
-    }
-    else if (nodeCompareWithData(parent, data) > 0) {
+    } else if (nodeCompareWithData(parent, data) > 0) {
         parent->left = new_node;
-    }
-    else {
+    } else {
         parent->right = new_node;
     }
 
@@ -213,9 +207,10 @@ static Node* search(const RedBlackTree* tree, Data* data) {
     return searchHelper(tree->root, data, tree->NIL);
 }
 
-const Data* searchWithName(const RedBlackTree* tree, char* name) {
+const Data* searchWithName(const RedBlackTree* tree, const char* name) {
+    assert(tree != NULL);
     Data* data = malloc(sizeof(Data));
-    data->name = name;
+    data->name = my_strdup(name);
     const Data* rst = search(tree, data)->data;
     free(data);
     return rst;
@@ -232,7 +227,7 @@ static void freeStructFieldElement(structFieldElement* e) {
     }
 }
 
-static void freeType(Type* t) {
+void freeType(Type* t) {
     if (t == NULL) {
         perror("Can't free a null pointer. {RBTree.c freeType}\n");
         exit(EXIT_FAILURE);
@@ -244,8 +239,9 @@ static void freeType(Type* t) {
     case ARRAY:
         freeType(t->array.elemType);
         break;
-    case STRUCTURE:
-        freeStructFieldElement(t->fields);
+    case STRUCT:
+        free(t->structure.struct_name);
+        freeStructFieldElement(t->structure.fields);
         break;
     default:
         perror("false type to free in {RBTree.c freeType}.\n");
@@ -317,6 +313,30 @@ void dataToString(Data* d) {
         exit(EXIT_FAILURE);
     }
     printf("%*s%s\n", 4, "", d->name);
+}
+
+static structFieldElement* deepCopyFieldElement(const structFieldElement* src) {
+    if (src == NULL) {
+        return NULL;
+    }
+    structFieldElement* dst = malloc(sizeof(structFieldElement));
+    dst->name = my_strdup(src->name);
+    dst->elemType = deepCopyType(src->elemType);
+    dst->next = deepCopyFieldElement(src->next);
+    return dst;
+}
+
+Type* deepCopyType(const Type* src) {
+    Type* dst = malloc(sizeof(Type));
+    dst->kind = src->kind;
+    if (src->kind == ARRAY) {
+        dst->array.size = src->array.size;
+        dst->array.elemType = deepCopyType(src->array.elemType);
+    } else if (src->kind == STRUCT) {
+        dst->structure.struct_name = my_strdup(src->structure.struct_name);
+        dst->structure.fields = deepCopyFieldElement(src->structure.fields);
+    }
+    return dst;
 }
 
 #ifdef RBTREE_test

@@ -1,17 +1,17 @@
 add_library(RBTree STATIC RBTree.c)
 target_include_directories(RBTree PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(RBTree PUBLIC PARSE_TREE)
+target_link_libraries(RBTree PUBLIC PARSE_TREE Utility)
 
 add_library(Environment STATIC Environment.c)
 target_include_directories(Environment PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(Environment PRIVATE RBTree)
+target_link_libraries(Environment PUBLIC RBTree)
 
 add_library(SymbolTable STATIC SymbolTable.c)
 target_include_directories(SymbolTable PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(SymbolTable PRIVATE Environment)
+target_link_libraries(SymbolTable PUBLIC Environment)
 
 # soft link
-execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/SymbolTable.h ${CMAKE_CURRENT_BINARY_DIR}/SymbolTable.h)
+#execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_CURRENT_SOURCE_DIR}/SymbolTable.h ${CMAKE_CURRENT_BINARY_DIR}/SymbolTable.h)
 
 
 if (RBTREE_TEST)

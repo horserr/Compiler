@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <SymbolTable.h>
+
 #include "ParseTree/ParseTree.h"
 
 #ifdef PARSER_DEBUG
@@ -9,6 +11,7 @@ extern int yydebug;
 extern int yylineno;
 extern void yyrestart(FILE* input_file);
 extern int yyparse();
+extern ParseTNode* root;
 
 void rewind(FILE* f) {
     if (!f) {
@@ -39,8 +42,19 @@ int main(const int argc, char** argv) {
     rewind(f);
     const int rst = parse();
     if (rst == 0) {
-        // print and free
+#ifdef LOCAL
+        // Redirect stdout to the output file
+        if (freopen("test/out/out.txt", "w", stdout) == NULL) {
+            perror("something wrong while redirect stdout.");
+            exit(EXIT_FAILURE);
+        }
         printParseTRoot();
+        // revert stdout to terminal
+        freopen("/dev/tty", "w",stdout);
+#endif
+        printf("hello console.\n");
+        buildTable(root);
+
         cleanParseTree();
     }
 

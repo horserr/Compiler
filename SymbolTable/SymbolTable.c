@@ -1,78 +1,29 @@
 #include <assert.h>
 #include <stdio.h>
+#include <time.h>
 #include "Environment.h"
-#include "SymbolTable_private.h"
+#include "../utils/utils.h"
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
-Environment* globalEnv = NULL;
 Environment* currentEnv = NULL;
+// a linked list registers those defined struct type
+StructTypeWrapper* definedStructList = NULL;
 
-ResolvePtr lookUpFunction(const char* expression) {
-    for (int i = 0; i < ARRAY_LEN(exprFuncLookUpTable); ++i) {
-        const ExprFuncPair pair = exprFuncLookUpTable[i];
-        if (strcmp(pair.expr, expression) == 0) {
-            return pair.func;
-        }
-    }
-    return NULL;
-}
-
-void resolver(const ParseTNode* parent_node, const char* expr) {
-    char* expr_copy = my_strdup(expr);
-    const char* delim = " ";
-    const char* e = strtok(expr_copy, delim);
-    int i = 0;
-    while (e != NULL) {
-        const ParseTNode* node = parent_node->children.container[i];
-        const ResolvePtr f = lookUpFunction(e);
-        if (f == NULL) {
-            fprintf(stderr, "Invalid expression name \"%s\" {SymbolTable.c resolver}.\n", e);
-            exit(EXIT_FAILURE);
-        }
-
-        // default argument for option is null
-        f(node, NULL);
-        e = strtok(NULL, delim);
-        i++;
-    }
-    free(expr_copy);
-    assert(i==parent_node->children.num);
-}
-
-/**
- * @return the index of expr fitted in expressions
-*/
-__attribute__((warn_unused_result))
-int matchExprPattern(const ParseTNode* node, const char* expressions[], const int length) {
-    int i = 0;
-    while (i < length) {
-        if (nodeChildrenNameEqualHelper(node, expressions[i])) {
-            break;
-        }
-        i++;
-    }
-    if (i == length) {
-        perror("There must be a typo in expression list. Checking from {SymbolTable.c resolver}\n");
-        for (int j = 0; j < length; ++j) {
-            fprintf(stderr, "<%02d.>\t%s\n", j, expressions[j]);
-        }
-        exit(EXIT_FAILURE);
-    }
-    return i;
-}
-
-void* resolveArgs(const ParseTNode* node, void* opt) {
+void resolveArgs(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Args") == 0);
     const char* expressions[] = {
         "Exp COMMA Args",
         "Exp"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveExp(const ParseTNode* node, void* opt) {
+void resolveExp(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Exp") == 0);
     const char* expressions[] = {
         "Exp ASSIGNOP Exp",
         "Exp AND Exp",
@@ -92,50 +43,72 @@ void* resolveExp(const ParseTNode* node, void* opt) {
         "FLOAT"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveDec(const ParseTNode* node, void* opt) {
+structFieldElement* resolveDec(const ParseTNode* node, Type* type) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Dec") == 0);
     const char* expressions[] = {
         "VarDec",
         "VarDec ASSIGNOP Exp"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    if (i == 1) {
+        if (currentEnv->kind == STRUCTURE) {
+            // todo error
+        } else {
+            resolveExp(getChildByName(node, "Exp"));
+        }
+    }
 }
 
-void* resolveDecList(const ParseTNode* node, void* opt) {
+// todo change the return to a list of identities
+structFieldElement* resolveDecList(const ParseTNode* node, Type* type) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"DecList") == 0);
     const char* expressions[] = {
         "Dec",
         "Dec COMMA DecList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveDef(const ParseTNode* node, void* opt) {
+structFieldElement* resolveDef(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Def") == 0);
     const char* expressions[] = {
         "Specifier DecList SEMI"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    assert(i == 0);
+    Type* type = resolveSpecifier(getChildByName(node, "Specifier"));
+    return resolveDecList(getChildByName(node, "DecList"), type);
 }
 
-void* resolveDefList(const ParseTNode* node, void* opt) {
+structFieldElement* resolveDefList(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"DefList") == 0);
     const char* expressions[] = {
         "Def",
         "Def DefList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    // depend on environment kind(struct, function, global), it may have different effect
+    if (currentEnv->kind == STRUCTURE) {
+        // todo gather
+        return NULL;
+    }
+    resolveDef(getChildByName(node, "Def"));
+    if (i == 1) {
+        resolveDefList(getChildByName(node, "DefList"));
+    }
 }
 
-void* resolveStmt(const ParseTNode* node, void* opt) {
+void resolveStmt(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Stmt") == 0);
     const char* expressions[] = {
         "Exp SEMI",
         "CompSt",
@@ -145,319 +118,292 @@ void* resolveStmt(const ParseTNode* node, void* opt) {
         "WHILE LP Exp RP Stmt"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveStmtList(const ParseTNode* node, void* opt) {
+void resolveStmtList(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"StmtList") == 0);
     const char* expressions[] = {
         "Stmt",
         "Stmt StmtList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveCompSt(const ParseTNode* node, void* opt) {
+void resolveCompSt(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"CompSt") == 0);
     const char* expressions[] = {
         "LC DefList StmtList RC"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveParamDec(const ParseTNode* node, void* opt) {
+void resolveParamDec(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"ParamDec") == 0);
     const char* expressions[] = {
         "Specifier VarDec"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveVarList(const ParseTNode* node, void* opt) {
+void resolveVarList(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"VarList") == 0);
     const char* expressions[] = {
         "ParamDec",
         "ParamDec COMMA VarList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveFunDec(const ParseTNode* node, void* opt) {
+void resolveFunDec(const ParseTNode* node, const Type* returnType) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"FunDec") == 0);
     const char* expressions[] = {
         "ID LP VarList RP",
         "ID LP RP"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    //todo
 }
 
-void* resolveVarDec(const ParseTNode* node, void* opt) {
+void resolveVarDec(const ParseTNode* node, DecGather** gather) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"VarDec") == 0);
     const char* expressions[] = {
         "ID",
         "VarDec LB INT RB"
     };
-    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    // flatten array list and add to gather
+    int dimension = 0;
+    int size_list[MAX_DIMENSION];
+    // 'ID' skips this while loop
+    while (matchExprPattern(node, expressions,ARRAY_LEN(expressions)) != 0) {
+        if (dimension >= MAX_DIMENSION) {
+            fprintf(stderr, "The dimension of array can't exceed %d\n",MAX_DIMENSION);
+            exit(EXIT_FAILURE);
+        }
+        size_list[dimension] = getChildByName(node, "INT")->value.int_value;
+        dimension++;
+        node = getChildByName(node, "VarDec");
+    }
+    const ParseTNode* IDNode = getChildByName(node, "ID");
+    const char* name = IDNode->value.str_value;
+    // change the sequence of size in size_list
+    reverseArray(size_list, dimension);
+    gatherDecInfo(gather, name, dimension, size_list, IDNode->lineNum);
 }
 
-void* resolveTag(const ParseTNode* node, void* opt) {
+char* resolveTag(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Tag") == 0);
     const char* expressions[] = {
         "ID"
     };
-    const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    assert(matchExprPattern(node, expressions, ARRAY_LEN(expressions)) == 0);
+    return my_strdup(getChildByName(node, "ID")->value.str_value);
 }
 
-void* resolveOptTag(const ParseTNode* node, void* opt) {
+char* resolveOptTag(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"OptTag") == 0);
     const char* expressions[] = {
         "",
         "ID"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    if (i == 0) {
+        return NULL;
+    }
+    return my_strdup(getChildByName(node, "ID")->value.str_value);
 }
 
-void* resolveStructSpecifier(const ParseTNode* node, void* opt) {
+char* randomString(const int len) {
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const int charsetSize = sizeof(charset) - 1;
+    srand(time(0));
+    // len + 7('-struct') + 1(\0)
+    char* str = malloc(sizeof(char) * (len + 7 + 1));
+    for (int i = 0; i < len; ++i) {
+        const int key = rand() % charsetSize;
+        str[i] = charset[key];
+    }
+    str[len] = '\0';
+    strcat(str, "-struct");
+    return str;
+}
+
+const Type* resolveStructSpecifier(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"StructSpecifier") == 0);
     const char* expressions[] = {
         "STRUCT OptTag LC DefList RC",
         "STRUCT Tag"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    Type* rt_type = NULL;
+    if (i == 0) {
+        char* name = resolveOptTag(getChildByName(node, "OptTag"));
+        if (name == NULL) {
+            name = randomString(5);
+        }
+        rt_type = malloc(sizeof(Type));
+        rt_type->kind = STRUCT;
+        rt_type->structure.struct_name = name;
+        rt_type->structure.fields = resolveDefList(getChildByName(node, "DefList"));
+        // todo add this type to defined struct type list
+        // todo deep copy struct type?
+    } else if (i == 1) {
+        char* name = resolveTag(getChildByName(node, "Tag"));
+        rt_type = findDefinedStructType(definedStructList, name);
+        free(name);
+        if (rt_type == NULL) {
+            // error doesn't find struct type
+        }
+    }
+    assert(rt_type != NULL);
+    return rt_type;
 }
 
-void* resolveSpecifier(const ParseTNode* node, void* opt) {
+/**
+ * @note return a copy of Type
+*/
+const Type* resolveSpecifier(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"Specifier") == 0);
     const char* expressions[] = {
         "TYPE",
         "StructSpecifier"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    if (i == 0) {
+        return createBasicTypeOfNode(getChildByName(node, "TYPE"));
+    }
+    // i == 1
+    const EnvKind prev = currentEnv->kind;
+    currentEnv->kind = STRUCTURE;
+    const Type* type = resolveStructSpecifier(getChildByName(node, "StructSpecifier"));
+    currentEnv->kind = prev;
+    return type;
 }
 
-void* resolveExtDecList(const ParseTNode* node, void* opt) {
+/**
+ * @note relay function between 'VarDec' and 'ExtDef'
+*/
+void resolveExtDecList(const ParseTNode* node, DecGather** gather) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"ExtDecList") == 0);
     const char* expressions[] = {
         "VarDec",
         "VarDec COMMA ExtDecList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    resolveVarDec(getChildByName(node, "VarDec"), gather);
+    assert(*gather != NULL);
+    if (i == 1) {
+        resolveExtDecList(getChildByName(node, "ExtDecList"), gather);
+    }
 }
 
-void* resolveExtDef(const ParseTNode* node, void* opt) {
+void resolveExtDef(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"ExtDef") == 0);
     const char* expressions[] = {
         "Specifier ExtDecList SEMI",
         "Specifier SEMI",
         "Specifier FunDec CompSt"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    // todo extract the type and check their existence
+    if (i == 0) {
+        const Type* type = resolveSpecifier(getChildByName(node, "Specifier"));
+        DecGather* gather = NULL;
+        resolveExtDecList(getChildByName(node, "ExtDecList"), &gather);
+        // loop through gather
+        const DecGather* g = gather;
+        while (g != NULL) {
+            // check duplication in current environment
+            if (searchWithName(currentEnv->Map, g->name) != NULL) {
+                char buffer[50];
+                sprintf(buffer, "Redefined variable \"%s\".\n", g->name);
+                error(3, g->lineNum, buffer);
+                g = g->next;
+                continue;
+            }
+
+            Data* data = malloc(sizeof(Data));
+            data->name = my_strdup(g->name);
+            data->kind = VAR;
+            // use size_list to create array type
+            // get the address of variable type to allocate memory in place
+            Type** t = &data->variable.type;
+            for (int j = 0; j < g->dimension; ++j) {
+                *t = malloc(sizeof(Type));
+                (*t)->kind = ARRAY;
+                (*t)->array.size = g->size_list[j];
+                *t = (*t)->array.elemType;
+            }
+            *t = deepCopyType(type);
+
+            insert(currentEnv->Map, data);
+            g = g->next;
+        }
+        freeGather(gather);
+        freeType(type);
+    } else if (i == 1) {
+        /* if the specifier is a struct, whether it has name or not,
+         * then it will be registered in `resolveSpecifier`;
+         * else if the specifier is a type, then we can ignore it directly.
+        */
+        Type* type = resolveSpecifier(getChildByName(node, "Specifier"));
+        freeType(type);
+    } else if (i == 2) {
+        Type* returnType = resolveSpecifier(getChildByName(node, "Specifier"));
+        resolveFunDec(getChildByName(node, "FunDec"), returnType);
+        // todo function component and create environment
+        //  and check return type
+        resolveCompSt(getChildByName(node, "CompSt"));
+        // todo remember to free type and change back env
+        freeType(returnType);
+    }
 }
 
-void* resolveExtDefList(const ParseTNode* node, void* opt) {
+void resolveExtDefList(const ParseTNode* node) {
+    assert(node != NULL);
+    assert(strcmp(node->name,"ExtDefList") == 0);
     const char* expressions[] = {
         "",
         "ExtDef ExtDefList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    resolver(node, expressions[i]);
-    return NULL;
+    if (i == 1) {
+        resolveExtDef(getChildByName(node, "ExtDef"));
+        resolveExtDefList(getChildByName(node, "ExtDefList"));
+    }
 }
 
 
 void buildTable(const ParseTNode* root) {
+    assert(root != NULL);
     assert(strcmp(root->name,"Program") == 0);
     char* expressions[] = {
         "ExtDefList"
     };
-    globalEnv = currentEnv = newEnvironment(NULL);
-    const int i = matchExprPattern(root, expressions,ARRAY_LEN(expressions));
-    resolver(root,expressions[i]);
+    currentEnv = newEnvironment(NULL, GLOBAL);
+    Environment* globalEnv = currentEnv;
+    assert(matchExprPattern(root, expressions, ARRAY_LEN(expressions)) == 0);
+    resolveExtDefList(getChildByName(root, "ExtDefList"));
     freeEnvironment(globalEnv);
 }
 
 #ifdef SYMBOL_test
 int main() {
-    // NOTE: incomplete test case
-    // Create the root node
-    ParseTNode* root = createParseTNode("Program", 1, 0);
-
-    // Create ExtDefList node
-    ParseTNode* extDefList = createParseTNode("ExtDefList", 1, 0);
-    addChild(root, extDefList);
-
-    // Create ExtDef node
-    ParseTNode* extDef = createParseTNode("ExtDef", 1, 0);
-    addChild(extDefList, extDef);
-
-    ParseTNode* extDefList1 = createParseTNode("ExtDefList", 1, 0);
-    addChild(extDefList, extDefList1);
-
-    // Create Specifier node
-    ParseTNode* specifier = createParseTNode("Specifier", 1, 0);
-    addChild(extDef, specifier);
-
-    // Create TYPE node with value
-    ValueUnion typeValue;
-    typeValue.str_value = "int";
-    ParseTNode* type = createParseTNodeWithValue("TYPE", 1, typeValue);
-    addChild(specifier, type);
-
-    // Create FunDec node
-    ParseTNode* funDec = createParseTNode("FunDec", 1, 0);
-    addChild(extDef, funDec);
-
-    // Create ID node with value
-    ValueUnion idValue;
-    idValue.str_value = "main";
-    ParseTNode* id = createParseTNodeWithValue("ID", 1, idValue);
-    addChild(funDec, id);
-
-    // Create LP and RP nodes
-    ParseTNode* lp = createParseTNode("LP", 1, 1);
-    ParseTNode* rp = createParseTNode("RP", 1, 1);
-    addChild(funDec, lp);
-    addChild(funDec, rp);
-
-    // Create CompSt node
-    ParseTNode* compSt = createParseTNode("CompSt", 2, 0);
-    addChild(extDef, compSt);
-
-    // Create LC node
-    ParseTNode* lc = createParseTNode("LC", 2, 1);
-    addChild(compSt, lc);
-
-    // Create DefList node
-    ParseTNode* defList = createParseTNode("DefList", 3, 0);
-    addChild(compSt, defList);
-
-    // Create Def node
-    ParseTNode* def = createParseTNode("Def", 3, 0);
-    addChild(defList, def);
-
-    // Create Specifier node for Def
-    ParseTNode* defSpecifier = createParseTNode("Specifier", 3, 0);
-    addChild(def, defSpecifier);
-
-    // Create TYPE node with value for Def
-    ParseTNode* defType = createParseTNodeWithValue("TYPE", 3, typeValue);
-    addChild(defSpecifier, defType);
-
-    // Create DecList node
-    ParseTNode* decList = createParseTNode("DecList", 3, 0);
-    addChild(def, decList);
-
-    // Create Dec node
-    ParseTNode* dec = createParseTNode("Dec", 3, 0);
-    addChild(decList, dec);
-
-    // Create VarDec node
-    ParseTNode* varDec = createParseTNode("VarDec", 3, 0);
-    addChild(dec, varDec);
-
-    // Create ID node with value for VarDec
-    ValueUnion varIdValue;
-    varIdValue.str_value = "i";
-    ParseTNode* varId = createParseTNodeWithValue("ID", 3, varIdValue);
-    addChild(varDec, varId);
-
-    // Create ASSIGNOP node
-    ParseTNode* assignop = createParseTNode("ASSIGNOP", 3, 1);
-    addChild(dec, assignop);
-
-    // Create Exp node
-    ParseTNode* exp = createParseTNode("Exp", 3, 0);
-    addChild(dec, exp);
-
-    // Create INT node with value
-    ValueUnion intValue;
-    intValue.int_value = 0;
-    ParseTNode* intNode = createParseTNodeWithValue("INT", 3, intValue);
-    addChild(exp, intNode);
-
-    // Create SEMI node
-    ParseTNode* semi = createParseTNode("SEMI", 3, 1);
-    addChild(def, semi);
-
-    // Create StmtList node
-    ParseTNode* stmtList = createParseTNode("StmtList", 4, 0);
-    addChild(compSt, stmtList);
-
-    // Create Stmt node
-    ParseTNode* stmt = createParseTNode("Stmt", 4, 0);
-    addChild(stmtList, stmt);
-
-    // Create Exp node for Stmt
-    ParseTNode* stmtExp = createParseTNode("Exp", 4, 0);
-    addChild(stmt, stmtExp);
-
-    // Create Exp node for ID
-    ParseTNode* idExp = createParseTNode("Exp", 4, 0);
-    addChild(stmtExp, idExp);
-
-    // Create ID node with value for Exp
-    ValueUnion jValue;
-    jValue.str_value = "j";
-    ParseTNode* jId = createParseTNodeWithValue("ID", 4, jValue);
-    addChild(idExp, jId);
-
-    // Create ASSIGNOP node for Stmt
-    ParseTNode* stmtAssignop = createParseTNode("ASSIGNOP", 4, 1);
-    addChild(stmtExp, stmtAssignop);
-
-    // Create Exp node for assignment
-    ParseTNode* assignExp = createParseTNode("Exp", 4, 0);
-    addChild(stmtExp, assignExp);
-
-    // Create Exp node for ID i
-    ParseTNode* iExp = createParseTNode("Exp", 4, 0);
-    addChild(assignExp, iExp);
-
-    // Create ID node with value for Exp
-    ValueUnion iValue;
-    iValue.str_value = "i";
-    ParseTNode* iId = createParseTNodeWithValue("ID", 4, iValue);
-    addChild(iExp, iId);
-
-    // Create PLUS node
-    ParseTNode* plus = createParseTNode("PLUS", 4, 1);
-    addChild(assignExp, plus);
-
-    // Create Exp node for INT 1
-    ParseTNode* intExp = createParseTNode("Exp", 4, 0);
-    addChild(assignExp, intExp);
-
-    // Create INT node with value 1
-    ValueUnion oneValue;
-    oneValue.int_value = 1;
-    ParseTNode* oneInt = createParseTNodeWithValue("INT", 4, oneValue);
-    addChild(intExp, oneInt);
-
-    // Create SEMI node for Stmt
-    ParseTNode* stmtSemi = createParseTNode("SEMI", 4, 1);
-    addChild(stmt, stmtSemi);
-
-    // Create RC node
-    ParseTNode* rc = createParseTNode("RC", 2, 1);
-    addChild(compSt, rc);
-
-    // Build the symbol table
-    buildTable(root);
-
-    // Free the parse tree
-    freeParseTNode(root);
 }
 #endif
