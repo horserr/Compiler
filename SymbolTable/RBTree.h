@@ -13,13 +13,18 @@ void insert(RedBlackTree* tree, Data* data);
 const Data* searchWithName(const RedBlackTree* tree, const char* name);
 void freeRedBlackTree(RedBlackTree* tree);
 // debug utilities
-void typeToString(Type* t);
-void dataToString(Data* d);
+const char* typeToString(const Type* type);
+const char* dataToString(const Data* data);
 void inorder(const RedBlackTree* tree);
 
 // utility function
 void freeType(Type* t);
-Type* deepCopyType(const Type* src);
+void freeData(Data* d);
+const Type* deepCopyType(const Type* src);
+const Data* deepCopyData(const Data* src);
+int typeEqual(const Type* t1, const Type* t2);
+int getArrayDimension(const Type* arrayType, Type** base_type);
+
 
 // type definition
 struct structFieldElement {
@@ -29,8 +34,8 @@ struct structFieldElement {
 };
 
 struct Type {
-    enum { INT, FLOAT, ARRAY, STRUCT } kind;
-
+    enum { INT, FLOAT, ARRAY, STRUCT, ERROR } kind;
+    // error is the most generic type and only use when resolve expression 'resolveExp SymbolTable.c'
     union {
         // array needs element type and size
         struct {

@@ -1,7 +1,12 @@
 #include <stdio.h>
+#include <stdlib.h>
+#ifdef LOCAL
+#include <ParseTree.h>
 #include <SymbolTable.h>
-
+#else
 #include "ParseTree/ParseTree.h"
+#include "SymbolTable/SymbolTable.h"
+#endif
 
 #ifdef PARSER_DEBUG
 extern int yydebug;
@@ -52,7 +57,7 @@ int main(const int argc, char** argv) {
         // revert stdout to terminal
         freopen("/dev/tty", "w",stdout);
 #endif
-        printf("hello console.\n");
+        // printf("hello console.\n");
         buildTable(root);
 
         cleanParseTree();

@@ -1,10 +1,6 @@
 #ifndef PARSE_TREE
 #define PARSE_TREE
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 // Forward declaration of ParseTNode
 typedef struct ParseTNode ParseTNode;
 

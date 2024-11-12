@@ -3,9 +3,8 @@ project(Compiler LANGUAGES C)
 set(CMAKE_C_STANDARD 11)
 
 ADD_COMPILE_DEFINITIONS("LOCAL")
-option(PARSE_TREE_TEST "test PARSE TREE date structure" ON)
+option(PARSE_TREE_TEST "test PARSE TREE date structure" OFF)
 option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF)
-option(RBTREE_TEST "test red black tree" ON)
 option(SYMBOL_TEST "test symbol table" ON)
 
 # todo add sanitizer flags in debug mode and git
@@ -39,7 +38,6 @@ message(STATUS "ASAN_OPTIONS is ${ASAN_OPTIONS}")
 # Set sanitizer environment variables
 set_target_properties(sanitizer_flags PROPERTIES
         INTERFACE_COMPILE_DEFINITIONS "ASAN_OPTIONS=${ASAN_OPTIONS}")
-# todo link this library to other targets
 
 find_package(FLEX 2.6.4 REQUIRED)
 find_package(BISON 3.0.4 REQUIRED)
@@ -65,9 +63,11 @@ add_executable(${PROJECT_NAME}
         ${BISON_Parser_OUTPUTS}
 )
 target_link_libraries(${PROJECT_NAME}
+        PARSE_TREE
         SymbolTable
         ${FLEX_LIBRARIES}
         ${BISON_LIBRARIES}
         sanitizer_flags
+        Utility
 )
 # note: remember to change the current working directory to project root in clion

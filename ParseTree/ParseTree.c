@@ -51,7 +51,6 @@ static void freeArrayList(const ArrayList* list) {
         freeParseTNode(list->container[i]);
     }
     free(list->container);
-    // free(list);
 }
 
 // ParseTree Tree functions
@@ -171,7 +170,7 @@ void cleanParseTree() {
 }
 
 /**
- * @brief compare expression's own name or its children name with the given text
+ * @brief compare expression's children name with the given text
  * @param node the parse tree node to be compared
  * @param text the name or expression string as comparison target
  * @return 1 if equal; 0 not equal
@@ -234,7 +233,8 @@ int matchExprPattern(const ParseTNode* node, const char* expressions[], const in
         i++;
     }
     if (i == length) {
-        perror("There must be a typo in expression list. Checking from {SymbolTable.c resolver}\n");
+        perror("There must be a typo in expression list. Checking from {ParseTree.c matchExprPattern}\n");
+        fprintf(stderr,"node: %s\n",node->name);
         for (int j = 0; j < length; ++j) {
             fprintf(stderr, "<%02d.>\t%s\n", j, expressions[j]);
         }

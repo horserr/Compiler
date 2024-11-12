@@ -6,11 +6,14 @@ This code is provided by @author costheta_z
 **/
 #include "RBTree.h"
 #include <assert.h>
-#include <ParseTree.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef LOCAL
+#include <utils.h>
+#else
 #include "../utils/utils.h"
+#endif
 
 
 ///// Red Black Tree /////////////////////////////////////////
@@ -235,6 +238,7 @@ void freeType(Type* t) {
     switch (t->kind) {
     case INT:
     case FLOAT:
+    case ERROR:
         break;
     case ARRAY:
         freeType(t->array.elemType);
@@ -250,7 +254,7 @@ void freeType(Type* t) {
     free(t);
 }
 
-static void freeData(Data* d) {
+void freeData(Data* d) {
     if (d == NULL) {
         perror("Can't free null Data. {RBTree.c freeData}\n");
         exit(EXIT_FAILURE);
@@ -292,27 +296,82 @@ void freeRedBlackTree(RedBlackTree* tree) {
 }
 
 ///// print helpers //////////////////////////////////////////
-void typeToString(Type* t) {
-    // todo
+/**
+ * @brief turn Type into string
+ * @return a copy of string
+*/
+const char* typeToString(const Type* type) {
+    assert(type != NULL);
+    switch (type->kind) {
+    case ERROR: return my_strdup("T: Error");
+    case INT: return my_strdup("T: int");
+    case FLOAT: return my_strdup("T: float");
+    case ARRAY: return my_strdup("T: array");
+    case STRUCT:
+        char buffer[50];
+        sprintf(buffer, "T: struct, name: %s", type->structure.struct_name);
+        return my_strdup(buffer);
+    default: return my_strdup("**UNKNOWN TYPE**");
+    }
 }
 
-void dataToString(Data* d) {
-    if (d == NULL) {
+
+/**
+ * @brief turn Data into string
+ * @return a copy of string
+*/
+const char* dataToString(const Data* data) {
+    if (data == NULL) {
         perror("Can't print out null data. {RBTree.c dataToString}\n");
         exit(EXIT_FAILURE);
     }
-    switch (d->kind) {
-    case VAR:
-        printf("Data<variable>: \n");
-        break;
-    case FUNC:
-        printf("Data<function>: \n");
-        break;
-    default:
-        perror("false type of data. {RBTree.c dataToString}\n");
-        exit(EXIT_FAILURE);
+    const char buffer[80];
+    if (data->kind == VAR) {
+        const char* strType = typeToString(data->variable.type);
+        sprintf(buffer, "<V: %s (%s)>", data->name, strType);
+        free((char*)strType);
+    } else { // data->kind == FUNC
+        char tmp[30];
+        sprintf(tmp, "<F: %s (", data->name);
+        strcat(buffer, tmp);
+        for (int i = 0; i < data->function.argc; ++i) {
+            const char* strType = typeToString(data->function.argvTypes[i]);
+            strcat(buffer, strType);
+            free((char*)strType);
+        }
+        strcat(buffer,")>");
     }
-    printf("%*s%s\n", 4, "", d->name);
+    return my_strdup(buffer);
+}
+
+// utility functions
+/**
+ * @brief check two types are the same or not
+ * @return 1 if same; 0 distinct.
+*/
+int typeEqual(const Type* t1, const Type* t2) {
+    assert(t1 != NULL && t2 != NULL);
+    assert(t1->kind != ERROR && t2->kind != ERROR);
+    if (t1->kind != t2->kind) {
+        return 0;
+    } // t1->kind == t2->kind
+    if (t1->kind == INT || t1->kind == FLOAT) {
+        return 1;
+    }
+    if (t1->kind == ARRAY) {
+        Type* base1 = NULL;
+        Type* base2 = NULL;
+        const int d1 = getArrayDimension(t1, &base1);
+        const int d2 = getArrayDimension(t2, &base2);
+        if (d1 != d2) {
+            return 0;
+        }
+        const int rst = typeEqual(base1, base2);
+        freeType(base1);
+        freeType(base2);
+        return rst;
+    } // t1->kind == STRUCT
+    return strcmp(t1->structure.struct_name, t2->structure.struct_name) == 0;
 }
 
 static structFieldElement* deepCopyFieldElement(const structFieldElement* src) {
@@ -326,7 +385,8 @@ static structFieldElement* deepCopyFieldElement(const structFieldElement* src) {
     return dst;
 }
 
-Type* deepCopyType(const Type* src) {
+const Type* deepCopyType(const Type* src) {
+    assert(src != NULL);
     Type* dst = malloc(sizeof(Type));
     dst->kind = src->kind;
     if (src->kind == ARRAY) {
@@ -337,6 +397,46 @@ Type* deepCopyType(const Type* src) {
         dst->structure.fields = deepCopyFieldElement(src->structure.fields);
     }
     return dst;
+}
+
+const Data* deepCopyData(const Data* src) {
+    assert(src != NULL);
+    Data* dst = malloc(sizeof(Data));
+    dst->name = my_strdup(src->name);
+    dst->kind = src->kind;
+    if (src->kind == VAR) {
+        dst->variable.type = deepCopyType(src->variable.type);
+    } else if (src->kind == FUNC) {
+        dst->function.returnType = deepCopyType(src->function.returnType);
+        const int argc = src->function.argc;
+        dst->function.argc = argc;
+        dst->function.argvTypes = malloc(sizeof(Type*) * argc);
+        for (int i = 0; i < argc; ++i) {
+            dst->function.argvTypes[i] = deepCopyType(src->function.argvTypes[i]);
+        }
+    }
+    return dst;
+}
+
+/**
+ * @brief get array dimension and may get base_type as well
+ * @param arrayType
+ * @param base_type if set to NULL, nothing will happen;
+ *                  if not null while it's pointing to NULL, then tie a new copy of base type.
+ * @return the dimension of array type
+*/
+int getArrayDimension(const Type* arrayType, Type** base_type) {
+    assert(arrayType != NULL);
+    int dimension = 0;
+    while (arrayType->kind == ARRAY) {
+        dimension++;
+        arrayType = arrayType->array.elemType;
+    }
+    if (base_type != NULL) {
+        assert(*base_type == NULL);                  // *base_type should be initialized to NULL
+        *base_type = (Type*)deepCopyType(arrayType); // suppress warning
+    }
+    return dimension;
 }
 
 #ifdef RBTREE_test

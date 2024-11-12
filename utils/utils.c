@@ -1,9 +1,11 @@
 #include "utils.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // utility to duplicate a string
 char* my_strdup(const char* src) {
@@ -33,6 +35,21 @@ void reverseArray(int arr[], const int size) {
         start++;
         end--;
     }
+}
+
+const char* randomString(const int len, const char* suffix) {
+    assert(len >= 1 && suffix != NULL);
+    const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    const int charsetSize = sizeof(charset) - 1;
+    srand(time(0));
+    char* str = malloc(sizeof(char) * (len + strlen(suffix) + 1));
+    for (int i = 0; i < len; ++i) {
+        const int key = rand() % charsetSize;
+        str[i] = charset[key];
+    }
+    str[len] = '\0';
+    strcat(str, suffix);
+    return str;
 }
 
 void error(const int type, const int lineNum, const char* message) {
