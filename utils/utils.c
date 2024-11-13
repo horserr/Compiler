@@ -36,7 +36,9 @@ void reverseArray(int arr[], const int size) {
         end--;
     }
 }
-
+/**
+ * @return a copy of string
+*/
 const char* randomString(const int len, const char* suffix) {
     assert(len >= 1 && suffix != NULL);
     const char charset[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";

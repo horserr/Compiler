@@ -8,17 +8,17 @@
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
 Environment* currentEnv = NULL;
-Environment* globalEnv = NULL;
 // register all defined functions
 RedBlackTree* funcMap = NULL;
 // a linked list registers those defined struct type
-StructTypeWrapper* definedStructList = NULL;
+StructRegister* definedStructList = NULL;
 
 /**
  * @brief helper function for 'resolveExp'
+ * @warning may return ERROR type
  * @return a copy of type of expression
 */
-const Type* resolveBinaryOperator(const ParseTNode* node) {
+const Type* evalBinaryOperator(const ParseTNode* node) {
     const char* expressions[] = {
         "Exp ASSIGNOP Exp", // 0
         "Exp AND Exp",      // 1
@@ -89,18 +89,26 @@ const Type* resolveBinaryOperator(const ParseTNode* node) {
 
 /**
  * @brief helper function for 'resolveExp'
+ * @warning may return ERROR type
  * @return a copy of type of function's return type.
 */
-const Type* resolveFuncInvocation(const ParseTNode* node) {
+const Type* evalFuncInvocation(const ParseTNode* node) {
     const char* expressions[] = {
         "ID LP Args RP",
         "ID LP RP"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-
     const ParseTNode* child = getChildByName(node, "ID");
     const char* name = child->value.str_value;
     const int lineNum = child->lineNum;
+    if (searchEntireScopeWithName(currentEnv, name) != NULL) {
+        const char buffer[50];
+        sprintf(buffer, "\"%s\" is not a function.\n", name);
+        error(11, lineNum, buffer);
+        Type* t = malloc(sizeof(Type));
+        t->kind = ERROR;
+        return t;
+    }
     const Data* data = searchWithName(funcMap, name);
     if (data == NULL) { // not find function definition
         char buffer[50];
@@ -117,11 +125,11 @@ const Type* resolveFuncInvocation(const ParseTNode* node) {
         assert(gather != NULL);
         if (!checkFuncCallArgs(data, gather)) {
             const char* strType = dataToString(data);
-            const char buffer[80];
+            const char buffer[300];
             sprintf(buffer, "Function %s is not applicable for arguments.\n", strType);
             error(9, lineNum, buffer);
             free((char*)strType);
-            // error occurs, but still return the correct type
+            // error occurs, but still returns the correct type
         }
         freeParamGather(gather);
     }
@@ -129,8 +137,88 @@ const Type* resolveFuncInvocation(const ParseTNode* node) {
 }
 
 /**
+ * @brief helper function for 'resolveExp'
+ * @warning may return ERROR type
+ * @return a copy of element type in struct.
+*/
+const Type* evalStruct(const ParseTNode* node) {
+    const char* expressions[] = {
+        "Exp DOT ID"
+    };
+    assert(matchExprPattern(node, expressions, ARRAY_LEN(expressions)) == 0);
+    const Type* expType = resolveExp(getChildByName(node, "Exp"));
+    if (expType->kind == ERROR) return expType;
+    if (expType->kind != STRUCT) {
+        const int lineNum = getChildByName(node, "DOT")->lineNum;
+        error(13, lineNum, "Illegal use of \".\".\n");
+        freeType((Type*)expType);
+        Type* t = malloc(sizeof(Type));
+        t->kind = ERROR;
+        return t;
+    }
+    // get the name of identifier
+    const char* name = getChildByName(node, "ID")->value.str_value;
+    // loop through the field of struct
+    const structFieldElement* f = expType->structure.fields;
+    while (f != NULL) {
+        if (strcmp(f->name, name) == 0) break;
+        f = f->next;
+    }
+    if (f == NULL) {
+        const int lineNum = getChildByName(node, "DOT")->lineNum;
+        const char buffer[50];
+        sprintf(buffer, "Non-existent field \"%s\".\n", name);
+        error(14, lineNum, buffer);
+        freeType((Type*)expType);
+        Type* t = malloc(sizeof(Type));
+        t->kind = ERROR;
+        return t;
+    }
+    assert(strcmp(f->name, name) == 0);
+    const Type* copy = deepCopyType(f->elemType);
+    freeType((Type*)expType);
+    return copy;
+}
+
+/**
+ * @brief helper function for 'resolveExp'
+ * @warning may return ERROR type
+ * @return a copy of element type in struct.
+*/
+const Type* evalArray(const ParseTNode* node) {
+    const char* expressions[] = {
+        "Exp LB Exp RB"
+    };
+    assert(matchExprPattern(node, expressions, ARRAY_LEN(expressions)) == 0);
+    const ParseTNode* firstExp = node->children.container[0];
+    const Type* first = resolveExp(firstExp);
+    if (first->kind == ERROR) return first;
+    if (first->kind != ARRAY) {
+        error(10, firstExp->lineNum, "is not an array.\n");
+        freeType((Type*)first);
+        Type* t = malloc(sizeof(Type));
+        t->kind = ERROR;
+        return t;
+    }
+    const ParseTNode* secondExp = node->children.container[2];
+    const Type* second = resolveExp(secondExp);
+    if (second->kind != INT) {
+        error(12, secondExp->lineNum, "is not an integer.\n");
+        freeType((Type*)first);
+        freeType((Type*)second);
+        Type* t = malloc(sizeof(Type));
+        t->kind = ERROR;
+        return t;
+    }
+    const Type* rst = deepCopyType(first->array.elemType);
+    freeType((Type*)first);
+    freeType((Type*)second);
+    return rst;
+}
+
+/**
+ * @warning may return ERROR type
  * @return a copy of type for this expression
- * @note the default type to leave is left expression type.
 */
 const Type* resolveExp(const ParseTNode* node) {
     assert(node != NULL);
@@ -156,10 +244,11 @@ const Type* resolveExp(const ParseTNode* node) {
         "FLOAT"             // 17
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    if (i <= 7) return resolveBinaryOperator(node);
+    if (i <= 7) return evalBinaryOperator(node);
     if (i == 8) return resolveExp(getChildByName(node, "Exp"));
     if (i == 9) {
         const Type* expType = resolveExp(getChildByName(node, "Exp"));
+        if (expType->kind == ERROR) return expType;
         if (!(expType->kind == INT || expType->kind == FLOAT)) {
             const int lineNum = getChildByName(node, "MINUS")->lineNum;
             error(7, lineNum, "Type mismatched for operands.\n");
@@ -172,6 +261,7 @@ const Type* resolveExp(const ParseTNode* node) {
     }
     if (i == 10) {
         const Type* expType = resolveExp(getChildByName(node, "Exp"));
+        if (expType->kind == ERROR) return expType;
         if (expType->kind != INT) {
             const int lineNum = getChildByName(node, "NOT")->lineNum;
             error(7, lineNum, "Type mismatched for operands.\n");
@@ -182,13 +272,12 @@ const Type* resolveExp(const ParseTNode* node) {
         }
         return expType;
     }
-    if (i == 11 || i == 12) return resolveFuncInvocation(node);
-    if (i == 13 || i == 14) {
-        // todo struct
-        return;
-    }
+    if (i == 11 || i == 12) return evalFuncInvocation(node);
+    if (i == 13) return evalArray(node);
+    if (i == 14) return evalStruct(node);
     if (i == 15) {
         const char* name = getChildByName(node, "ID")->value.str_value;
+        assert(currentEnv->kind == COMPOUND || currentEnv->kind == GLOBAL); // not in struct env
         const Data* d = searchEntireScopeWithName(currentEnv, name);
         if (d == NULL) {
             const int lineNum = getChildByName(node, "ID")->lineNum;
@@ -202,11 +291,10 @@ const Type* resolveExp(const ParseTNode* node) {
         assert(d->kind == VAR);
         return deepCopyType(d->variable.type);
     }
-    if (i == 16 || i == 17) {
-        return createBasicTypeOfNode(node->children.container[0]);
-    }
+    if (i == 16 || i == 17) return createBasicTypeOfNode(node->children.container[0]);
 }
 
+// simply gather all arguments, regardless is error or not.
 void resolveArgs(const ParseTNode* node, ParamGather** gather) {
     assert(node != NULL);
     assert(strcmp(node->name,"Args") == 0);
@@ -230,9 +318,9 @@ void resolveArgs(const ParseTNode* node, ParamGather** gather) {
 }
 
 /**
- * @return if encounter assignment, a copy of type; else NULL
+ * @brief relay function
 */
-const Type* resolveDec(const ParseTNode* node, DecGather** gather) {
+void resolveDec(const ParseTNode* node, DecGather** gather) {
     assert(node != NULL);
     assert(strcmp(node->name,"Dec") == 0);
     const char* expressions[] = {
@@ -240,15 +328,11 @@ const Type* resolveDec(const ParseTNode* node, DecGather** gather) {
         "VarDec ASSIGNOP Exp"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
+    assert(i == 0 || i == 1);
     resolveVarDec(getChildByName(node, "VarDec"), gather);
-    const Type* expType = NULL;
-    if (i == 1) {
-        expType = resolveExp(getChildByName(node, "Exp"));
-    }
-    return expType;
 }
 
-void resolveDecList(const ParseTNode* node, const Type* base_type) {
+void resolveDecList(const ParseTNode* node, DecGather** gather) {
     assert(node != NULL);
     assert(strcmp(node->name,"DecList") == 0);
     const char* expressions[] = {
@@ -256,56 +340,82 @@ void resolveDecList(const ParseTNode* node, const Type* base_type) {
         "Dec COMMA DecList"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    DecGather* gather = NULL;
-    const Type* expType = resolveDec(getChildByName(node, "Dec"), &gather);
-    assert(gather != NULL && gather->next == NULL); // only gather one
-
-    assert(currentEnv != NULL && currentEnv->kind != GLOBAL); // not global environment
-    // search in current env
-    const Data* d = searchWithName(currentEnv->vMap, gather->name);
-    // todo check name with those defined struct names
-    if (d != NULL) {
-        assert(d->kind == VAR);
-        const int lineNum = getChildByName(node, "Dec")->lineNum;
-        char buffer[50];
-        sprintf(buffer, "Redefined variable \"%s\".\n", gather->name);
-        error(3, lineNum, buffer);
-    } else { // haven't defined
-        // todo check name with defined structure names
-        const Type* type = turnDecGather2Type(gather, base_type);
-        // todo check error type
-        if (expType != NULL && !typeEqual(type, expType)) {
-            const int lineNum = getChildByName(node, "Dec")->lineNum;
-            error(5, lineNum, "Type mismatched for assignment.\n");
-        }
-        // temporary data
-        Data* data = malloc(sizeof(Data));
-        data->kind = VAR;
-        data->name = my_strdup(gather->name);
-        data->variable.type = (Type*)type; // directly pointing to type, so no need to free
-        insert(currentEnv->vMap, data);
-    }
-    if (expType != NULL) freeType((Type*)expType);
-    freeDecGather(gather);
-
+    resolveDec(getChildByName(node, "Dec"), gather);
     if (i == 1) {
-        resolveDecList(getChildByName(node, "DecList"), base_type);
+        resolveDecList(getChildByName(node, "DecList"), gather);
     }
 }
 
-void resolveDef(const ParseTNode* node) {
+/**
+ * @brief check initialization type. Helper function for 'resolveCompSt'
+*/
+void checkInit(const ParseTNode* CompSt_node, const Type* expect) {
+    assert(CompSt_node != NULL);
+    assert(strcmp(CompSt_node->name, "DecList") == 0);
+    const char* DecList_expressions[] = {
+        "Dec",
+        "Dec COMMA DecList"
+    };
+    const int i = matchExprPattern(CompSt_node, DecList_expressions, ARRAY_LEN(DecList_expressions));
+    const ParseTNode* Dec_node = getChildByName(CompSt_node, "Dec");
+    const char* Dec_expressions[] = {
+        "VarDec",
+        "VarDec ASSIGNOP Exp"
+    };
+    const int j = matchExprPattern(Dec_node, Dec_expressions, ARRAY_LEN(Dec_expressions));
+    if (j == 1) {
+        const int lineNum = getChildByName(Dec_node, "ASSIGNOP")->lineNum;
+        if (currentEnv->kind == STRUCTURE) {
+            error(15, lineNum, "initializing a field in structure.\n");
+        } else {
+            const Type* type = resolveExp(getChildByName(Dec_node, "Exp"));
+            assert(type != NULL);
+            // ignore error, because it has been dealt with.
+            if (type->kind != ERROR && !typeEqual(expect, type)) {
+                error(5, lineNum, "Type mismatched for assignment.\n");
+            }
+        }
+    }
+    if (i == 1) {
+        checkInit(getChildByName(CompSt_node, "DecList"), expect);
+    }
+}
+
+void resolveDef(const ParseTNode* node, ParamGather** param_gather) {
     assert(node != NULL);
     assert(strcmp(node->name,"Def") == 0);
     const char* expressions[] = {
         "Specifier DecList SEMI"
     };
     assert(matchExprPattern(node, expressions, ARRAY_LEN(expressions)) == 0);
-    const Type* type = resolveSpecifier(getChildByName(node, "Specifier"));
-    resolveDecList(getChildByName(node, "DecList"), type);
-    freeType((Type*)type);
+    const Type* base_type = resolveSpecifier(getChildByName(node, "Specifier"));
+    if (base_type->kind == ERROR) {
+        freeType((Type*)base_type);
+        return;
+    }
+    DecGather* dec_gather = NULL;
+    resolveDecList(getChildByName(node, "DecList"), &dec_gather);
+    assert(dec_gather != NULL);
+    const DecGather* g = dec_gather;
+    // loop through dec gather and construct param gather
+    while (g != NULL) {
+        Data* d = malloc(sizeof(Data));
+        d->kind = VAR;
+        d->name = my_strdup(g->name);
+        d->variable.type = (Type*)turnDecGather2Type(g, base_type);
+        gatherParamInfo(param_gather, d, g->lineNum);
+        freeData(d);
+        g = g->next;
+    }
+    freeDecGather(dec_gather);
+    freeType((Type*)base_type);
 }
 
-void resolveDefList(const ParseTNode* node) {
+/**
+ * @brief relay function between 'Def' and ('CompSt', '')
+ * @note the sequence in param gather is the reverse order of the original
+*/
+void resolveDefList(const ParseTNode* node, ParamGather** gather) {
     assert(node != NULL);
     assert(strcmp(node->name,"DefList") == 0);
     const char* expressions[] = {
@@ -314,9 +424,8 @@ void resolveDefList(const ParseTNode* node) {
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
     if (i == 0) return;
-    //i == 1
-    resolveDef(getChildByName(node, "Def"));
-    resolveDefList(getChildByName(node, "DefList"));
+    resolveDef(getChildByName(node, "Def"), gather);
+    resolveDefList(getChildByName(node, "DefList"), gather);
 }
 
 void resolveStmt(const ParseTNode* node, const Type* returnType) {
@@ -337,12 +446,13 @@ void resolveStmt(const ParseTNode* node, const Type* returnType) {
     }
     // i == 0 do nothing
     const Type* expType = resolveExp(getChildByName(node, "Exp"));
-    if (i == 2 && !typeEqual(returnType, expType)) {
+    if (i == 2 && (expType->kind == ERROR || !typeEqual(returnType, expType))) {
+        // not tolerate error in here
         const int lineNum = getChildByName(node, "RETURN")->lineNum;
         error(8, lineNum, "Type mismatched for return.\n");
     } else if (3 <= i && i <= 5) {
         if (expType->kind != INT) {
-            // todo tolerant error
+            // not tolerate error in here
             const int lineNum = getChildByName(node, "Exp")->lineNum;
             error(7, lineNum, "Type mismatched for operands.\n");
         }
@@ -380,8 +490,33 @@ void resolveCompSt(const ParseTNode* node, const Type* returnType) {
         "LC DefList StmtList RC"
     };
     assert(matchExprPattern(node, expressions, ARRAY_LEN(expressions)) == 0);
-    resolveDefList(getChildByName(node, "DefList"));
+    // add another layer of environment
+    currentEnv = newEnvironment(currentEnv, COMPOUND);
+    ParamGather* gather = NULL;
+    resolveDefList(getChildByName(node, "DefList"), &gather);
+    // reverse param gather, because it adds from head
+    reverseParamGather(&gather);
+    const ParamGather* g = gather;
+    // loop through gather to define variables
+    while (g != NULL) {
+        const Data* data = g->data;
+        assert(data->kind == VAR);
+        if (searchWithName(currentEnv->vMap, data->name) != NULL ||
+            findDefinedStruct(definedStructList, data->name) != NULL) { // haven't defined OR collide with struct name
+            char buffer[50];
+            sprintf(buffer, "Redefined variable \"%s\".\n", data->name);
+            error(3, g->lineNum, buffer);
+        } else {
+            insert(currentEnv->vMap, (Data*)deepCopyData(data));
+        }
+        g = g->next;
+    }
+    // check assignment(initialization)
+    // checkInit(getChildByName(node, "DecList"), d->variable.type);
+
+    freeParamGather(gather);
     resolveStmtList(getChildByName(node, "StmtList"), returnType);
+    revertEnvironment(&currentEnv);
 }
 
 void resolveParamDec(const ParseTNode* node, ParamGather** gather) {
@@ -392,7 +527,10 @@ void resolveParamDec(const ParseTNode* node, ParamGather** gather) {
     };
     assert(matchExprPattern(node, expressions, ARRAY_LEN(expressions)) == 0);
     const Type* type = resolveSpecifier(getChildByName(node, "Specifier"));
-
+    if (type->kind == ERROR) {
+        freeType((Type*)type);
+        return;
+    }
     DecGather* decGather = NULL;
     resolveVarDec(getChildByName(node, "VarDec"), &decGather);
     assert(decGather != NULL);
@@ -423,16 +561,14 @@ int resolveVarList(const ParseTNode* node, ParamGather** gather, const int n) {
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
     resolveParamDec(getChildByName(node, "ParamDec"), gather);
-    if (i == 1) {
-        resolveVarList(getChildByName(node, "VarList"), gather, n + 1);
-    }
-    return n;
+    if (i == 0) return n;
+    return resolveVarList(getChildByName(node, "VarList"), gather, n + 1);
 }
 
 /**
  * @brief gather the variable list names and its types and function name
  * @return a number of parameters
- * @note name is a new copy.
+ * @note name is a new copy. And guarantee that the sequence of vars is the same as theirs in gather.
 */
 int resolveFunDec(const ParseTNode* node, ParamGather** gather, char** name) {
     assert(node != NULL);
@@ -448,6 +584,7 @@ int resolveFunDec(const ParseTNode* node, ParamGather** gather, char** name) {
     if (i == 0) {
         num = resolveVarList(getChildByName(node, "VarList"), gather, 1);
     }
+    reverseParamGather(gather);
     return num;
 }
 
@@ -478,6 +615,9 @@ void resolveVarDec(const ParseTNode* node, DecGather** gather) {
     gatherDecInfo(gather, name, dimension, size_list, IDNode->lineNum);
 }
 
+/**
+ * @return a copy of string.
+*/
 const char* resolveTag(const ParseTNode* node) {
     assert(node != NULL);
     assert(strcmp(node->name,"Tag") == 0);
@@ -488,6 +628,10 @@ const char* resolveTag(const ParseTNode* node) {
     return my_strdup(getChildByName(node, "ID")->value.str_value);
 }
 
+/**
+ * @brief if is ID get its name; else get a random string.
+ * @return a copy of name.
+*/
 const char* resolveOptTag(const ParseTNode* node) {
     assert(node != NULL);
     assert(strcmp(node->name,"OptTag") == 0);
@@ -496,12 +640,15 @@ const char* resolveOptTag(const ParseTNode* node) {
         "ID"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    if (i == 0) {
-        return NULL;
-    }
+    if (i == 0) return randomString(5, "-struct");
     return my_strdup(getChildByName(node, "ID")->value.str_value);
 }
 
+/**
+ * @brief construct and retrieve OR simply retrieve struct type
+ * @warning may return ERROR type.
+ * @return a copy of type.
+*/
 const Type* resolveStructSpecifier(const ParseTNode* node) {
     assert(node != NULL);
     assert(strcmp(node->name,"StructSpecifier") == 0);
@@ -509,32 +656,76 @@ const Type* resolveStructSpecifier(const ParseTNode* node) {
         "STRUCT OptTag LC DefList RC",
         "STRUCT Tag"
     };
+    // use environment to check duplication
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    Type* rt_type = NULL;
-    if (i == 0) {
-        char* name = resolveOptTag(getChildByName(node, "OptTag"));
-        if (name == NULL) {
-            name = randomString(5, "-struct");
+    if (i == 1) {
+        const char* name = resolveTag(getChildByName(node, "Tag"));
+        const Type* type = findDefinedStruct(definedStructList, name);
+        if (type == NULL) { // not register in defined list
+            const int lineNum = getChildByName(node, "Tag")->lineNum;
+            const char buffer[50];
+            sprintf(buffer, "Undefined structure \"%s\".\n", name);
+            error(17, lineNum, buffer);
+            free((char*)name);
+            Type* t = malloc(sizeof(Type));
+            t->kind = ERROR;
+            return t;
         }
-        rt_type = malloc(sizeof(Type));
-        rt_type->kind = STRUCT;
-        rt_type->structure.struct_name = name;
-        // rt_type->structure.fields = resolveDefList(getChildByName(node, "DefList"));
-        // todo add this type to defined struct type list
-        // todo deep copy struct type?
-    } else if (i == 1) {
-        char* name = resolveTag(getChildByName(node, "Tag"));
-        rt_type = findDefinedStructType(definedStructList, name);
-        free(name);
-        if (rt_type == NULL) {
-            // error doesn't find struct type
-        }
+        assert(type->kind == STRUCT);
+        free((char*)name);
+        return deepCopyType(type);
     }
-    assert(rt_type != NULL);
-    return rt_type;
+    const char* name = resolveOptTag(getChildByName(node, "OptTag"));
+    if (findDefinedStruct(definedStructList, name) != NULL ||
+        searchWithName(currentEnv->vMap, name) != NULL) {
+        // collide with defined struct OR variable name in current env
+        const char buffer[50];
+        sprintf(buffer, "Duplicated name \"%s\".\n", name);
+        error(16, getChildByName(node, "STRUCT")->lineNum, buffer);
+        free((char*)name);
+        Type* t = malloc(sizeof(Type));
+        t->kind = ERROR;
+        return t;
+    }
+
+    currentEnv = newEnvironment(currentEnv, STRUCTURE); // mainly for checking duplication
+    ParamGather* gather = NULL;
+    resolveDefList(getChildByName(node, "DefList"), &gather);
+    // reverse param gather, because it adds from head
+    reverseParamGather(&gather);
+
+    const ParamGather* g = gather;
+    Type* struct_type = malloc(sizeof(Type));
+    struct_type->kind = STRUCT;
+    struct_type->structure.struct_name = (char*)name; // directly pointing to name, so no need to free.
+    structFieldElement** f = &struct_type->structure.fields;
+    // loop through param gather to construct STRUCT
+    while (g != NULL) {
+        const Data* data = g->data;
+        assert(data->kind == VAR);
+        if (searchWithName(currentEnv->vMap, data->name) != NULL) { // duplicate variable in current field
+            const char buffer[50];
+            sprintf(buffer, "Redefined field \"%s\".\n", data->name);
+            error(15, g->lineNum, buffer);
+            g = g->next;
+            continue;
+        }
+        *f = malloc(sizeof(structFieldElement));
+        (*f)->name = my_strdup(data->name);
+        (*f)->elemType = (Type*)deepCopyType(data->variable.type);
+        f = &(*f)->next;
+        insert(currentEnv->vMap, (Data*)deepCopyData(data)); // register in struct map
+        g = g->next;
+    }
+    *f = NULL;
+    addDefinedStruct(&definedStructList, struct_type); // register struct type in defined list
+    revertEnvironment(&currentEnv);
+    freeParamGather(gather);
+    return struct_type;
 }
 
 /**
+ * @warning may return ERROR type.
  * @return a copy of Type
 */
 const Type* resolveSpecifier(const ParseTNode* node) {
@@ -545,15 +736,8 @@ const Type* resolveSpecifier(const ParseTNode* node) {
         "StructSpecifier"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    if (i == 0) {
-        return createBasicTypeOfNode(getChildByName(node, "TYPE"));
-    }
-    // i == 1
-    const EnvKind prev = currentEnv->kind;
-    currentEnv->kind = STRUCTURE;
-    const Type* type = resolveStructSpecifier(getChildByName(node, "StructSpecifier"));
-    currentEnv->kind = prev;
-    return type;
+    if (i == 0) return createBasicTypeOfNode(getChildByName(node, "TYPE"));
+    return resolveStructSpecifier(getChildByName(node, "StructSpecifier"));
 }
 
 /**
@@ -569,23 +753,22 @@ void resolveExtDecList(const ParseTNode* node, DecGather** gather) {
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
     resolveVarDec(getChildByName(node, "VarDec"), gather);
     assert(*gather != NULL);
-    if (i == 1) {
-        resolveExtDecList(getChildByName(node, "ExtDecList"), gather);
-    }
+    if (i == 1) resolveExtDecList(getChildByName(node, "ExtDecList"), gather);
 }
 
+// todo extract into separate functions
 void resolveExtDef(const ParseTNode* node) {
     assert(node != NULL);
-    assert(strcmp(node->name,"ExtDef") == 0);
+    assert(strcmp(node->name, "ExtDef") == 0);
     const char* expressions[] = {
         "Specifier SEMI",
         "Specifier ExtDecList SEMI",
         "Specifier FunDec CompSt"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    // todo check the type existence for structure
     const Type* type = resolveSpecifier(getChildByName(node, "Specifier"));
-    if (i == 0) {
+    assert(type != NULL);
+    if (type->kind == ERROR || i == 0) {
         freeType((Type*)type);
         return;
     }
@@ -597,9 +780,8 @@ void resolveExtDef(const ParseTNode* node) {
         assert(currentEnv != NULL && currentEnv->kind == GLOBAL); // in global environment
         while (g != NULL) {
             // check duplication in current(global) environment
-            const Data* d = searchWithName(currentEnv->vMap, g->name);
-            if (d != NULL) {
-                assert(d->kind == VAR);
+            if (searchWithName(currentEnv->vMap, g->name) != NULL ||
+                findDefinedStruct(definedStructList, g->name) != NULL) {
                 char buffer[50];
                 sprintf(buffer, "Redefined variable \"%s\".\n", g->name);
                 error(3, g->lineNum, buffer);
@@ -622,47 +804,57 @@ void resolveExtDef(const ParseTNode* node) {
     char* name = NULL;
     const int argc = resolveFunDec(getChildByName(node, "FunDec"), &gather, &name);
     assert(name != NULL); // function name should be obtained
-
     assert(funcMap != NULL);
-    const Data* d = searchWithName(funcMap, name);
-    if (d != NULL) {
-        assert(d->kind == FUNC);
+    if (searchWithName(funcMap, name) != NULL) {
         const int lineNum = getChildByName(node, "FunDec")->lineNum;
         char buffer[50];
         sprintf(buffer, "Redefined function \"%s\".\n", name);
         error(4, lineNum, buffer);
         free(name);
-    } else {
-        Data* func_data = malloc(sizeof(Data));
-        func_data->kind = FUNC;
-        func_data->name = name; // directly pointing to name, so no need to free
-        func_data->function.argc = argc;
-        func_data->function.returnType = (Type*)deepCopyType(type);
-        func_data->function.argvTypes = malloc(sizeof(Type*) * argc);
-        // loop through paramGather
-        const ParamGather* g = gather;
-        /* reversely copy the type
-         * because param gather collects an element from its head */
-        int j = argc - 1;
-        while (g != NULL) {
-            assert(g->data->kind == VAR); // all parameters collected should be variables
-            func_data->function.argvTypes[j] = (Type*)deepCopyType(g->data->variable.type);
-            j--;
-            g = g->next;
-        }
-        assert(j == -1 && g == NULL);
-        insert(funcMap, func_data);
-        currentEnv = newEnvironment(currentEnv, FUNCTION);
-
-        // register all parameters in new environment
-        g = gather; // loop through paramGather again
-        while (g != NULL) {
-            insert(currentEnv->vMap, (Data*)deepCopyData(g->data)); // reminder: copy data
-            g = g->next;
-        }
-        resolveCompSt(getChildByName(node, "CompSt"), type);
-        revertEnvironment(&currentEnv);
+        freeParamGather(gather);
+        freeType((Type*)type); // suppress warning
+        return;
     }
+    Data* func_data = malloc(sizeof(Data));
+    func_data->kind = FUNC;
+    func_data->name = name; // directly pointing to name, so no need to free
+    func_data->function.argc = argc;
+    func_data->function.returnType = (Type*)deepCopyType(type);
+    func_data->function.argvTypes = malloc(sizeof(Type*) * argc);
+    // loop through paramGather to fill up argvTypes
+    const ParamGather* g = gather;
+    int j = 0;
+    while (g != NULL) {
+        assert(g->data->kind == VAR); // all parameters collected should be variables
+        func_data->function.argvTypes[j] = (Type*)deepCopyType(g->data->variable.type);
+        j++;
+        g = g->next;
+    }
+    insert(funcMap, func_data);
+    currentEnv = newEnvironment(currentEnv, COMPOUND);
+    // register all parameters in new environment
+    g = gather; // loop through paramGather again
+    while (g != NULL) {
+        const Data* data = g->data;
+        assert(data->kind == VAR && currentEnv != NULL);
+        if (searchWithName(currentEnv->vMap, data->name) != NULL ||
+            findDefinedStruct(definedStructList, data->name) != NULL) { // duplication in parameters
+            const char buffer[50];
+            sprintf(buffer, "Redefined variable \"%s\".\n", data->name);
+            error(3, g->lineNum, buffer);
+            Data* tmp = malloc(sizeof(Data));
+            tmp->kind = VAR;
+            // generate a random new name, and leave type as it is
+            tmp->variable.type = (Type*)deepCopyType(data->variable.type);
+            tmp->name = (char*)randomString(5, "-param");
+            insert(currentEnv->vMap, tmp);
+        } else {
+            insert(currentEnv->vMap, (Data*)deepCopyData(g->data)); // reminder: copy data
+        }
+        g = g->next;
+    }
+    resolveCompSt(getChildByName(node, "CompSt"), type);
+    revertEnvironment(&currentEnv);
     freeParamGather(gather);
     freeType((Type*)type); // suppress warning
 }
@@ -688,13 +880,15 @@ void buildTable(const ParseTNode* root) {
     char* expressions[] = {
         "ExtDefList"
     };
-    globalEnv = currentEnv = newEnvironment(NULL, GLOBAL);
+    definedStructList = NULL;
+    currentEnv = newEnvironment(NULL, GLOBAL);
     funcMap = createRedBlackTree();
     assert(matchExprPattern(root, expressions, ARRAY_LEN(expressions)) == 0);
     resolveExtDefList(getChildByName(root, "ExtDefList"));
-    freeEnvironment(globalEnv);
+    assert(currentEnv->kind == GLOBAL);
+    freeEnvironment(currentEnv);
     freeRedBlackTree(funcMap);
-    // todo remember to free funcmap and defined struct list;
+    freeDefinedStructList(definedStructList);
 }
 
 #ifdef SYMBOL_test

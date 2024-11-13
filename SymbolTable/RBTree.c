@@ -303,13 +303,13 @@ void freeRedBlackTree(RedBlackTree* tree) {
 const char* typeToString(const Type* type) {
     assert(type != NULL);
     switch (type->kind) {
-    case ERROR: return my_strdup("T: Error");
-    case INT: return my_strdup("T: int");
-    case FLOAT: return my_strdup("T: float");
-    case ARRAY: return my_strdup("T: array");
+    case ERROR: return my_strdup("T: Error ");
+    case INT: return my_strdup("T: int ");
+    case FLOAT: return my_strdup("T: float ");
+    case ARRAY: return my_strdup("T: array ");
     case STRUCT:
         char buffer[50];
-        sprintf(buffer, "T: struct, name: %s", type->structure.struct_name);
+        sprintf(buffer, "T: struct, name: %s ", type->structure.struct_name);
         return my_strdup(buffer);
     default: return my_strdup("**UNKNOWN TYPE**");
     }

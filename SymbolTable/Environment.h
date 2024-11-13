@@ -5,8 +5,7 @@
 #include "../ParseTree/ParseTree.h"
 #include "../utils/utils.h"
 
-
-typedef enum { GLOBAL, STRUCTURE, FUNCTION } EnvKind;
+typedef enum { GLOBAL, STRUCTURE, COMPOUND } EnvKind;
 
 typedef struct Environment {
     EnvKind kind;
@@ -15,12 +14,11 @@ typedef struct Environment {
 } Environment;
 
 // collect struct type and check whether they are defined
-typedef struct StructTypeWrapper {
+typedef struct StructRegister {
     Type* structType;
-    struct StructTypeWrapper* next;
-} StructTypeWrapper;
+    struct StructRegister* next;
+} StructRegister;
 
-// gather variable declared
 #define MAX_DIMENSION 10
 
 typedef struct DecGather {
@@ -41,19 +39,20 @@ Environment* newEnvironment(Environment* parent, EnvKind kind);
 const Data* searchEntireScopeWithName(const Environment* env, const char* name);
 void freeEnvironment(Environment* env);
 void revertEnvironment(Environment** current);
-void definedStructListAdd(StructTypeWrapper** head, const Type* type);
-const Type* findDefinedStructType(const StructTypeWrapper* head, const char* name);
 
 // utility functions
 const Type* createBasicTypeOfNode(const ParseTNode* basic_node);
-const Type* findDefinedStructType(const StructTypeWrapper* head, const char* name);
+// struct type register
+void addDefinedStruct(StructRegister** head, const Type* type);
+const Type* findDefinedStruct(const StructRegister* head, const char* name);
+void freeDefinedStructList(StructRegister* head);
 // Dec gather
 void gatherDecInfo(DecGather** head, const char* name, int dimension, const int size_list[], int lineNum);
 const Type* turnDecGather2Type(const DecGather* gather, const Type* base_type);
 void freeDecGather(DecGather* head);
-
 // Param gather
 void gatherParamInfo(ParamGather** head, const Data* data,  int lineNum);
+void reverseParamGather(ParamGather** head);
 int checkFuncCallArgs(const Data* func_data, const ParamGather* gather);
 void freeParamGather(ParamGather* head);
 

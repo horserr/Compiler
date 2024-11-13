@@ -84,19 +84,19 @@ const Type* createBasicTypeOfNode(const ParseTNode* basic_node) {
  *  @note head will be changed after calling this function
  *  @warning remember to free type passed in after use
 */
-void definedStructListAdd(StructTypeWrapper** head, const Type* type) {
+void addDefinedStruct(StructRegister** head, const Type* type) {
     assert(type->kind == STRUCT);
-    StructTypeWrapper* wrapper = malloc(sizeof(StructTypeWrapper));
-    wrapper->structType = deepCopyType(type);
-    wrapper->next = *(head);
-    *(head) = wrapper;
+    StructRegister* reg = malloc(sizeof(StructRegister));
+    reg->structType = deepCopyType(type);
+    reg->next = *(head);
+    *(head) = reg;
 }
 
 /**
  *  @brief find struct type using name
- *  @return if found, return type; else NULL.
+ *  @return if found, return type (no copy); else NULL.
  */
-const Type* findDefinedStructType(const StructTypeWrapper* head, const char* name) {
+const Type* findDefinedStruct(const StructRegister* head, const char* name) {
     while (head != NULL) {
         const Type* type = head->structType;
         assert(type->kind == STRUCT);
@@ -106,6 +106,15 @@ const Type* findDefinedStructType(const StructTypeWrapper* head, const char* nam
         head = head->next;
     }
     return NULL;
+}
+
+void freeDefinedStructList(StructRegister* head) {
+    while (head != NULL) {
+        StructRegister* tmp = head;
+        head = head->next;
+        freeType(tmp->structType);
+        free(tmp);
+    }
 }
 
 /**
@@ -139,9 +148,10 @@ const Type* turnDecGather2Type(const DecGather* gather, const Type* base_type) {
         *t = malloc(sizeof(Type));
         (*t)->kind = ARRAY;
         (*t)->array.size = gather->size_list[i];
-        *t = (*t)->array.elemType;
+        (*t)->array.elemType = NULL; // Initialize elemType to NULL
+        t = &(*t)->array.elemType;   // Update t to point to elemType
     }
-    *t = deepCopyType(base_type);
+    *t = (Type*)deepCopyType(base_type);
     return type;
 }
 
@@ -161,6 +171,19 @@ void gatherParamInfo(ParamGather** head, const Data* data, const int lineNum) {
     gather->data = deepCopyData(data);
     gather->next = *head;
     *head = gather;
+}
+
+void reverseParamGather(ParamGather** head) {
+    ParamGather* prev = NULL;
+    ParamGather* current = *head;
+    ParamGather* next = NULL;
+    while (current != NULL) {
+        next = current->next;
+        current->next = prev;
+        prev = current;
+        current = next;
+    }
+    *head = prev;
 }
 
 /**
