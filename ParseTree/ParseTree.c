@@ -3,7 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../utils/utils.h"
+#ifdef LOCAL
+#include <utils.h>
+#else
+#include "utils.h"
+#endif
+
 
 #define THRESHOLD 0.75
 

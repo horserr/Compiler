@@ -12,7 +12,7 @@ This code is provided by @author costheta_z
 #ifdef LOCAL
 #include <utils.h>
 #else
-#include "../utils/utils.h"
+#include "utils.h"
 #endif
 
 
@@ -307,10 +307,11 @@ const char* typeToString(const Type* type) {
     case INT: return my_strdup("T: int ");
     case FLOAT: return my_strdup("T: float ");
     case ARRAY: return my_strdup("T: array ");
-    case STRUCT:
+    case STRUCT: {
         char buffer[50];
         sprintf(buffer, "T: struct, name: %s ", type->structure.struct_name);
         return my_strdup(buffer);
+    }
     default: return my_strdup("**UNKNOWN TYPE**");
     }
 }
@@ -325,7 +326,7 @@ const char* dataToString(const Data* data) {
         perror("Can't print out null data. {RBTree.c dataToString}\n");
         exit(EXIT_FAILURE);
     }
-    const char buffer[80];
+    char buffer[80];
     if (data->kind == VAR) {
         const char* strType = typeToString(data->variable.type);
         sprintf(buffer, "<V: %s (%s)>", data->name, strType);

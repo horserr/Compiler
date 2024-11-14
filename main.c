@@ -4,8 +4,8 @@
 #include <ParseTree.h>
 #include <SymbolTable.h>
 #else
-#include "ParseTree/ParseTree.h"
-#include "SymbolTable/SymbolTable.h"
+#include "ParseTree.h"
+#include "SymbolTable.h"
 #endif
 
 #ifdef PARSER_DEBUG

@@ -102,7 +102,7 @@ const Type* evalFuncInvocation(const ParseTNode* node) {
     const char* name = child->value.str_value;
     const int lineNum = child->lineNum;
     if (searchEntireScopeWithName(currentEnv, name) != NULL) {
-        const char buffer[50];
+        char buffer[50];
         sprintf(buffer, "\"%s\" is not a function.\n", name);
         error(11, lineNum, buffer);
         Type* t = malloc(sizeof(Type));
@@ -127,7 +127,7 @@ const Type* evalFuncInvocation(const ParseTNode* node) {
         reverseParamGather(&gather);
         if (!checkFuncCallArgs(data, gather)) {
             const char* strType = dataToString(data);
-            const char buffer[300];
+            char buffer[300];
             sprintf(buffer, "Function %s is not applicable for arguments.\n", strType);
             error(9, lineNum, buffer);
             free((char*)strType);
@@ -168,7 +168,7 @@ const Type* evalStruct(const ParseTNode* node) {
     }
     if (f == NULL) {
         const int lineNum = getChildByName(node, "DOT")->lineNum;
-        const char buffer[50];
+        char buffer[50];
         sprintf(buffer, "Non-existent field \"%s\".\n", name);
         error(14, lineNum, buffer);
         freeType((Type*)expType);
@@ -693,7 +693,7 @@ const Type* resolveStructSpecifier(const ParseTNode* node) {
         const Type* type = findDefinedStruct(definedStructList, name);
         if (type == NULL) { // not register in defined list
             const int lineNum = getChildByName(node, "Tag")->lineNum;
-            const char buffer[50];
+            char buffer[50];
             sprintf(buffer, "Undefined structure \"%s\".\n", name);
             error(17, lineNum, buffer);
             free((char*)name);
@@ -709,7 +709,7 @@ const Type* resolveStructSpecifier(const ParseTNode* node) {
     if (findDefinedStruct(definedStructList, name) != NULL ||
         searchWithName(currentEnv->vMap, name) != NULL) {
         // collide with defined struct OR variable name in current env
-        const char buffer[50];
+        char buffer[50];
         sprintf(buffer, "Duplicated name \"%s\".\n", name);
         error(16, getChildByName(node, "STRUCT")->lineNum, buffer);
         free((char*)name);
@@ -734,7 +734,7 @@ const Type* resolveStructSpecifier(const ParseTNode* node) {
         const Data* data = g->data;
         assert(data->kind == VAR);
         if (searchWithName(currentEnv->vMap, data->name) != NULL) { // duplicate variable in current field
-            const char buffer[50];
+            char buffer[50];
             sprintf(buffer, "Redefined field \"%s\".\n", data->name);
             error(15, g->lineNum, buffer);
             g = g->next;
@@ -869,7 +869,7 @@ void resolveExtDef(const ParseTNode* node) {
         assert(data->kind == VAR && currentEnv != NULL);
         if (searchWithName(currentEnv->vMap, data->name) != NULL ||
             findDefinedStruct(definedStructList, data->name) != NULL) { // duplication in parameters
-            const char buffer[50];
+            char buffer[50];
             sprintf(buffer, "Redefined variable \"%s\".\n", data->name);
             error(3, g->lineNum, buffer);
             Data* tmp = malloc(sizeof(Data));

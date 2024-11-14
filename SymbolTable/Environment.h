@@ -2,8 +2,14 @@
 #define ENVIRONMENT
 
 #include "RBTree.h"
+#ifdef LOCAL
 #include "../ParseTree/ParseTree.h"
 #include "../utils/utils.h"
+#else
+#include "ParseTree.h"
+#include "utils.h"
+#endif
+
 
 typedef enum { GLOBAL, STRUCTURE, COMPOUND } EnvKind;
 

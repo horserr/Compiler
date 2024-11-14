@@ -1,5 +1,9 @@
 %code requires{
+#ifdef LOCAL
   #include "ParseTree/ParseTree.h"
+#else
+  #include "ParseTree.h"
+#endif
 }
 %{
   #ifdef LOCAL
