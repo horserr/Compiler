@@ -123,6 +123,8 @@ const Type* evalFuncInvocation(const ParseTNode* node) {
         ParamGather* gather = NULL;
         resolveArgs(getChildByName(node, "Args"), &gather);
         assert(gather != NULL);
+        // reverse gather because it adds from head
+        reverseParamGather(&gather);
         if (!checkFuncCallArgs(data, gather)) {
             const char* strType = dataToString(data);
             const char buffer[300];
@@ -328,8 +330,11 @@ void resolveDec(const ParseTNode* node, DecGather** gather) {
         "VarDec ASSIGNOP Exp"
     };
     const int i = matchExprPattern(node, expressions, ARRAY_LEN(expressions));
-    assert(i == 0 || i == 1);
     resolveVarDec(getChildByName(node, "VarDec"), gather);
+    if (i == 1 && currentEnv->kind == STRUCTURE) {
+        const int lineNum = getChildByName(node, "ASSIGNOP")->lineNum;
+        error(15, lineNum, "initializing a field in structure.\n");
+    }
 }
 
 void resolveDecList(const ParseTNode* node, DecGather** gather) {
@@ -347,37 +352,62 @@ void resolveDecList(const ParseTNode* node, DecGather** gather) {
 }
 
 /**
- * @brief check initialization type. Helper function for 'resolveCompSt'
+ * @brief check initialization type.
+ * manually traverse down parse tree to check assignment.
+ * Helper function for 'resolveCompSt'
 */
-void checkInit(const ParseTNode* CompSt_node, const Type* expect) {
-    assert(CompSt_node != NULL);
-    assert(strcmp(CompSt_node->name, "DecList") == 0);
-    const char* DecList_expressions[] = {
-        "Dec",
-        "Dec COMMA DecList"
+void checkInit(const ParseTNode* CompSt_node) {
+    assert(CompSt_node != NULL && strcmp(CompSt_node->name,"CompSt") == 0);
+    const char* CompSt_expressions[] = {"LC DefList StmtList RC"};
+    assert(matchExprPattern(CompSt_node, CompSt_expressions, ARRAY_LEN(CompSt_expressions)) == 0);
+    const ParseTNode* DefList_node = getChildByName(CompSt_node, "DefList");
+    const char* DefList_expressions[] = {
+        "",
+        "Def DefList"
     };
-    const int i = matchExprPattern(CompSt_node, DecList_expressions, ARRAY_LEN(DecList_expressions));
-    const ParseTNode* Dec_node = getChildByName(CompSt_node, "Dec");
-    const char* Dec_expressions[] = {
-        "VarDec",
-        "VarDec ASSIGNOP Exp"
-    };
-    const int j = matchExprPattern(Dec_node, Dec_expressions, ARRAY_LEN(Dec_expressions));
-    if (j == 1) {
-        const int lineNum = getChildByName(Dec_node, "ASSIGNOP")->lineNum;
-        if (currentEnv->kind == STRUCTURE) {
-            error(15, lineNum, "initializing a field in structure.\n");
-        } else {
-            const Type* type = resolveExp(getChildByName(Dec_node, "Exp"));
-            assert(type != NULL);
-            // ignore error, because it has been dealt with.
-            if (type->kind != ERROR && !typeEqual(expect, type)) {
-                error(5, lineNum, "Type mismatched for assignment.\n");
+    while (matchExprPattern(DefList_node, DefList_expressions,ARRAY_LEN(DefList_expressions)) == 1) {
+        const ParseTNode* Def_node = getChildByName(DefList_node, "Def");
+        const char* Def_expressions[] = {"Specifier DecList SEMI"};
+        assert(matchExprPattern(Def_node,Def_expressions,ARRAY_LEN(Def_expressions)) == 0);
+        const ParseTNode* DecList_node = getChildByName(Def_node, "DecList");
+        const char* DecList_expressions[] = {
+            "Dec",
+            "Dec COMMA DecList"
+        };
+        while (1) {
+            const ParseTNode* Dec_node = getChildByName(DecList_node, "Dec");
+            const char* Dec_expressions[] = {
+                "VarDec",
+                "VarDec ASSIGNOP Exp"
+            };
+            if (matchExprPattern(Dec_node, Dec_expressions,ARRAY_LEN(Dec_expressions)) == 1) {
+                assert(currentEnv->kind == COMPOUND);
+                const Type* type = resolveExp(getChildByName(Dec_node, "Exp"));
+                assert(type != NULL);
+                const Type* expect;
+                {
+                    DecGather* gather = NULL; // get the variable name using dec gather
+                    resolveVarDec(getChildByName(Dec_node, "VarDec"), &gather);
+                    assert(gather != NULL && gather->next == NULL); // only get one
+                    const Data* d = searchWithName(currentEnv->vMap, gather->name);
+                    // searching in current scope is enough
+                    assert(d != NULL && d->kind == VAR);
+                    expect = deepCopyType(d->variable.type);
+                    freeDecGather(gather);
+                }
+                // ignore error, because it has been dealt with.
+                if (type->kind != ERROR && !typeEqual(expect, type)) {
+                    const int lineNum = getChildByName(Dec_node, "ASSIGNOP")->lineNum;
+                    error(5, lineNum, "Type mismatched for assignment.\n");
+                }
             }
+            if (matchExprPattern(DecList_node, DecList_expressions,ARRAY_LEN(DecList_expressions)) == 0) {
+                break;
+            }
+            DecList_node = getChildByName(DecList_node, "DecList");
         }
-    }
-    if (i == 1) {
-        checkInit(getChildByName(CompSt_node, "DecList"), expect);
+
+        DefList_node = getChildByName(DefList_node, "DefList");
     }
 }
 
@@ -512,7 +542,7 @@ void resolveCompSt(const ParseTNode* node, const Type* returnType) {
         g = g->next;
     }
     // check assignment(initialization)
-    // checkInit(getChildByName(node, "DecList"), d->variable.type);
+    checkInit(node);
 
     freeParamGather(gather);
     resolveStmtList(getChildByName(node, "StmtList"), returnType);
