@@ -3,8 +3,8 @@
 
 
 #define DEBUG_INFO(message) \
-        fprintf(stderr, "%sChecking from {file name: %s :%s @%s}.\n",\
-                message, __FILE_NAME__, __LINE__, __FUNCTION__)
+  fprintf(stderr, "%sChecking from {%s :%d @%s}.\n",\
+    message, __FILE__, __LINE__, __FUNCTION__)
 
 char* my_strdup(const char *src);
 void reverseArray(int arr[], int size);

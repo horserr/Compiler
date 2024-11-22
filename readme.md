@@ -25,8 +25,7 @@ t = &(*t)->array.elemType;   // Update t to point to elemType
 ```
 
 - Inside switch statements, initialization cannot be done directly without curly braces.
-- A seemingly trivial error: I originally evaluated `Exp ASSIGNOP EXP` inside `resolveDef`. Alas, at this time variables
-  haven't been inserted into `vMap`.
+- A seemingly trivial error: I originally evaluated `Exp ASSIGNOP EXP` inside `resolveDef`. Alas, at this time variables haven't been inserted into `vMap`. So I squeeze through it by using a cumbersome function `checkInit`. Hope I will roll with it later.
 
 ## Project 1
 

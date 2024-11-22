@@ -9,7 +9,8 @@
 #include "utils.h"
 #endif
 
-#define THRESHOLD 0.75
+// #define THRESHOLD 0.75
+#define THRESHOLD 1
 
 // the definition of root.
 ParseTNode *root = NULL;
