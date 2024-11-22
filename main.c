@@ -14,13 +14,13 @@ extern int yydebug;
 
 // Declare the external variables and functions
 extern int yylineno;
-extern void yyrestart(FILE* input_file);
+extern void yyrestart(FILE *input_file);
 extern int yyparse();
-extern ParseTNode* root;
+extern ParseTNode *root;
 
-void rewind(FILE* f) {
+void rewind(FILE *f) {
     if (!f) {
-        perror("file can't open {main.c rewind}.");
+        DEBUG_INFO("File can't open.\n");
         return;
     }
     yylineno = 1;
@@ -34,12 +34,12 @@ int parse() {
     return yyparse();
 }
 
-int main(const int argc, char** argv) {
+int main(const int argc, char **argv) {
     if (argc == 1) {
         parse();
         return 0;
     }
-    FILE* f = fopen(argv[1], "r");
+    FILE *f = fopen(argv[1], "r");
     if (!f) {
         perror(argv[1]);
         return 1;
@@ -50,7 +50,7 @@ int main(const int argc, char** argv) {
 #ifdef LOCAL
         // Redirect stdout to the output file
         if (freopen("test/out/out.txt", "w", stdout) == NULL) {
-            perror("something wrong while redirect stdout.");
+            DEBUG_INFO("Something wrong while redirect stdout.\n");
             exit(EXIT_FAILURE);
         }
         printParseTRoot();

@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 
+
 def clear_directory(directory):
     if directory.exists() and directory.is_dir():
         for item in directory.iterdir():
@@ -8,6 +9,7 @@ def clear_directory(directory):
                 item.unlink()
             elif item.is_dir():
                 shutil.rmtree(item)
+
 
 def copy_files_and_libraries(libraries, files, dst_folder='./out'):
     dst_path = Path(dst_folder)
@@ -27,6 +29,7 @@ def copy_files_and_libraries(libraries, files, dst_folder='./out'):
         file_path = Path(file)
         if file_path.exists() and file_path.is_file():
             shutil.copy(file_path, dst_path / file_path.name)
+
 
 libraries = [
     '../ParseTree',

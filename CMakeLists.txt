@@ -13,14 +13,14 @@ set(SANITIZER_FLAGS "-fsanitize=address")
 set(DEBUG_FLAGS "-g")
 # Define ASAN options as a list
 set(ASAN_OPTIONS_LIST
-        "detect_leaks=1"
-        "detect_stack_use_after_return=1"
-        "detect_stack_use_after_scope=1"
-        "halt_on_error=1"
-        "verbosity=1"
-        "malloc_context_size=4"
-        # "detect_invalid_pointer_pairs=1"
-)
+    "detect_leaks=1"
+    "detect_stack_use_after_return=1"
+    "detect_stack_use_after_scope=1"
+    "halt_on_error=1"
+    "verbosity=1"
+    "malloc_context_size=4"
+    # "detect_invalid_pointer_pairs=1"
+    )
 
 # Add subdirectories
 add_subdirectory(utils)
@@ -37,37 +37,37 @@ list(JOIN ASAN_OPTIONS_LIST ":" ASAN_OPTIONS)
 message(STATUS "ASAN_OPTIONS is ${ASAN_OPTIONS}")
 # Set sanitizer environment variables
 set_target_properties(sanitizer_flags PROPERTIES
-        INTERFACE_COMPILE_DEFINITIONS "ASAN_OPTIONS=${ASAN_OPTIONS}")
+                      INTERFACE_COMPILE_DEFINITIONS "ASAN_OPTIONS=${ASAN_OPTIONS}")
 
 find_package(FLEX 2.6.4 REQUIRED)
 find_package(BISON 3.0.4 REQUIRED)
 
 flex_target(Lexer lexical.l ${CMAKE_BINARY_DIR}/lex.yy.c
-        DEFINES_FILE ${CMAKE_BINARY_DIR}/lex.yy.h
-)
+            DEFINES_FILE ${CMAKE_BINARY_DIR}/lex.yy.h
+            )
 if (PARSER_DEBUG)
     add_compile_definitions("PARSER_DEBUG")
     bison_target(Parser syntax.y ${CMAKE_BINARY_DIR}/syntax.tab.c
-            DEFINES_FILE ${CMAKE_BINARY_DIR}/syntax.tab.h
-            COMPILE_FLAGS "-v"
-    )
+                 DEFINES_FILE ${CMAKE_BINARY_DIR}/syntax.tab.h
+                 COMPILE_FLAGS "-v"
+                 )
 else ()
     bison_target(Parser syntax.y ${CMAKE_BINARY_DIR}/syntax.tab.c
-            DEFINES_FILE ${CMAKE_BINARY_DIR}/syntax.tab.h
-    )
+                 DEFINES_FILE ${CMAKE_BINARY_DIR}/syntax.tab.h
+                 )
 endif ()
 add_flex_bison_dependency(Lexer Parser)
 add_executable(${PROJECT_NAME}
-        main.c
-        ${FLEX_Lexer_OUTPUTS}
-        ${BISON_Parser_OUTPUTS}
-)
+               main.c
+               ${FLEX_Lexer_OUTPUTS}
+               ${BISON_Parser_OUTPUTS}
+               )
 target_link_libraries(${PROJECT_NAME}
-        PARSE_TREE
-        SymbolTable
-        ${FLEX_LIBRARIES}
-        ${BISON_LIBRARIES}
-        sanitizer_flags
-        Utility
-)
+                      PARSE_TREE
+                      SymbolTable
+                      ${FLEX_LIBRARIES}
+                      ${BISON_LIBRARIES}
+                      sanitizer_flags
+                      Utility
+                      )
 # note: remember to change the current working directory to project root in clion
