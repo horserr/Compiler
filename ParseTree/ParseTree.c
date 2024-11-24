@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #ifdef LOCAL
 #include <utils.h>
 #else
@@ -11,7 +12,6 @@
 
 // #define THRESHOLD 0.75
 #define THRESHOLD 1
-
 // the definition of root.
 ParseTNode *root = NULL;
 
@@ -249,9 +249,14 @@ int matchExprPattern(const ParseTNode *node, const char *expressions[], const in
   return i;
 }
 
+const ParseTNode* getRoot() {
+  return root;
+}
 
 //////test code/////////////////////////////////////////////
 #ifdef PARSE_TREE_test
 int main(int argc, char const* argv[]) {
 }
 #endif
+
+#undef THRESHOLD

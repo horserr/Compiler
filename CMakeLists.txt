@@ -17,15 +17,13 @@ set(ASAN_OPTIONS_LIST
     "detect_stack_use_after_return=1"
     "detect_stack_use_after_scope=1"
     "halt_on_error=1"
-    "verbosity=1"
-    "malloc_context_size=4"
-    # "detect_invalid_pointer_pairs=1"
     )
 
 # Add subdirectories
 add_subdirectory(utils)
 add_subdirectory(ParseTree)
 add_subdirectory(SymbolTable)
+add_subdirectory(IR)
 
 # Create a library with sanitizer flags
 add_library(sanitizer_flags INTERFACE)
@@ -65,6 +63,7 @@ add_executable(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
                       PARSE_TREE
                       SymbolTable
+                      IR
                       ${FLEX_LIBRARIES}
                       ${BISON_LIBRARIES}
                       sanitizer_flags

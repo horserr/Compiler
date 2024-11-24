@@ -1,4 +1,4 @@
-add_library(PARSE_TREE STATIC ParseTree.c)
+add_library(PARSE_TREE SHARED ParseTree.c)
 target_include_directories(PARSE_TREE PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(PARSE_TREE PRIVATE sanitizer_flags Utility)
 
