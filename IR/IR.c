@@ -21,15 +21,17 @@ void addCode(Chunk *sentinel, const Code code) {
 
 static void printOp(FILE *f, const Operand *op) {
   switch (op->kind) {
-    case VARIABLE:
+    case O_VARIABLE:
       fprintf(f, "%s ", op->value_s);
       break;
-    case CONSTANT:
+    case O_CONSTANT:
       fprintf(f, "#%s ", op->value_s);
       break;
-    case TEM_VAR:
+    case O_TEM_VAR:
       fprintf(f, "t%d ", op->var_no);
       break;
+    case O_FUNCTION:
+      fprintf(f, "%s ", op->value_s);
     default:
       break;
   }
@@ -37,24 +39,58 @@ static void printOp(FILE *f, const Operand *op) {
 
 static void printCode(FILE *f, const Code *c) {
   assert(c != NULL);
+  enum binary_op { ADD, SUB, MUL, DIV };
+  char b[] = {
+    [ADD] = '+', [SUB] = '-',
+    [MUL] = '*', [DIV] = '/',
+  };
+#define UNARY(T) \
+  do {\
+    fprintf(f, #T " ");\
+    printOp(f, &c->as.unary);\
+  } while(false)
+
+#define BINARY_CASE(T) \
+  case C_##T:\
+    do {\
+      printOp(f, &c->as.binary.result);\
+      fprintf(f, ":= ");\
+      printOp(f, &c->as.binary.op1);\
+      fprintf(f, "%c ",b[T]);\
+      printOp(f, &c->as.binary.op2);\
+    } while(false);\
+    break
+
   switch (c->kind) {
-    case ASSIGN:
+    BINARY_CASE(ADD);
+    BINARY_CASE(SUB);
+    BINARY_CASE(MUL);
+    BINARY_CASE(DIV);
+    case C_READ:
+      UNARY(READ);
+      break;
+    case C_WRITE:
+      UNARY(WRITE);
+      break;
+    case C_FUNCTION:
+      UNARY(FUNCTION);
+      fprintf(f, ": ");
+      break;
+    case C_PARAM:
+      UNARY(PARAM);
+      break;
+    case C_ASSIGN:
       printOp(f, &c->as.assign.left);
       fprintf(f, ":= ");
       printOp(f, &c->as.assign.right);
-      break;
-    case READ:
-      fprintf(f, "READ ");
-      printOp(f, &c->as.unary);
-      break;
-    case WRITE:
-      fprintf(f, "WRITE ");
-      printOp(f, &c->as.unary);
       break;
     default:
       break;
   }
   fprintf(f, "\n");
+
+#undef UNARY
+#undef BINARY_CASE
 }
 
 void printChunk(const char *file_name, const Chunk *sentinel) {
@@ -71,24 +107,25 @@ void printChunk(const char *file_name, const Chunk *sentinel) {
   fclose(f);
 }
 
-// a list contains the number of operand for each kind of code
-int a[] = {
-  [ASSIGN] = 2, // two operand
-  [ADD] = 3, [MUL] = 3, [SUB] = 3,
-};
-
 void freeOp(const Operand *op) {
   // todo free address op
   switch (op->kind) {
-    case VARIABLE:
-    case FUNCTION:
-    case CONSTANT:
+    case O_VARIABLE:
+    case O_FUNCTION:
+    case O_CONSTANT:
       free((char *) op->value_s);
       break;
     default:
       break;
   }
 }
+
+// a list contains the number of operand for each kind of code
+int a[] = {
+  [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
+  [C_ASSIGN] = 2,
+  [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3,
+};
 
 static void freeCode(const Code *code) {
   const Operand *op = (Operand *) &code->as;

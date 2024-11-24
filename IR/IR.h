@@ -3,10 +3,8 @@
 
 typedef struct Operand {
   enum {
-    TEM_VAR, TEM_ADDR,
-    VARIABLE, ADDRESS,
-    CONSTANT,
-    LABEL, FUNCTION
+    O_TEM_VAR, O_TEM_ADDR, O_VARIABLE, O_ADDRESS,
+    O_CONSTANT, O_LABEL, O_FUNCTION
   } kind;
 
   union {
@@ -19,9 +17,9 @@ typedef struct Operand {
 // a single line of code
 typedef struct {
   enum {
-    READ, WRITE,
-    ASSIGN,
-    ADD, SUB, MUL, DIV,
+    C_READ, C_WRITE, C_FUNCTION, C_PARAM, C_ARG,
+    C_ASSIGN,
+    C_ADD, C_SUB, C_MUL, C_DIV,
   } kind;
 
   union {

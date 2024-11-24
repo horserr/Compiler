@@ -1,4 +1,7 @@
 #include "Compile.h"
+
+#include <stdlib.h>
+#include <linux/limits.h>
 #ifdef LOCAL
 #include <ParseTree.h>
 #include <utils.h>
@@ -7,11 +10,13 @@
 #include "utils.h"
 #endif
 
+#define MAX_NUM_ARGC 20
+
 #define COMPILE(root, part) \
   compile##part(getChildByName(root, #part))
 
 #define CODE_ASSIGN(left, right) (Code){\
-    .kind = ASSIGN,\
+    .kind = C_ASSIGN,\
     .as.assign = {\
       .left = left,\
       .right = right\
@@ -19,7 +24,7 @@
   }
 
 #define OP_TEMP() (Operand){\
-    .kind = TEM_VAR,\
+    .kind = O_TEM_VAR,\
     .var_no = tmp_cnt++\
   }
 
@@ -41,24 +46,58 @@ static Operand evalFuncInvocation(const ParseTNode *node) {
   if (strcmp(getStrFromID(node), "read") == 0) {
     assert(i == 1);
     const Operand tmp = OP_TEMP();
-    addCode(sentinelChunk, (Code){.kind = READ, .as.unary = tmp});
+    addCode(sentinelChunk, (Code){.kind = C_READ, .as.unary = tmp});
     return tmp;
   }
   if (i == 0) {
-    Operand stack[20]; // maximum 20 arguments
+    Operand stack[MAX_NUM_ARGC]; // maximum 20 arguments
     int top = 0;
     compileArgs(getChildByName(node, "Args"), stack, &top);
     if (strcmp(getStrFromID(node), "write") == 0) {
       assert(top == 1);
-      addCode(sentinelChunk, (Code){.kind = WRITE, .as.unary = stack[0]});
-      return (Operand){.kind = CONSTANT, .value_s = my_strdup("0")};
+      addCode(sentinelChunk, (Code){.kind = C_WRITE, .as.unary = stack[0]});
+      return (Operand){.kind = O_CONSTANT, .value_s = my_strdup("0")};
     }
-    for (int j = 0; j < top; ++j) {
+    for (int j = top - 1; j >= 0; --j) {
       // todo
     }
   }
 }
 
+static Operand compileExp(const ParseTNode *node);
+
+static Operand evalArithmatic(const ParseTNode *node) {
+  const char *expressions[] = {
+    "Exp PLUS Exp",
+    "Exp MINUS Exp",
+    "Exp STAR Exp",
+    "Exp DIV Exp",
+  };
+  const int i = EXPRESSION_INDEX(node, expressions);
+  enum binary_op { ADD, SUB, MUL, DIV };
+#define CODE_BINARY_CASE(T) \
+  if (i == T) { \
+    const Operand op2 = compileExp(node->children.container[2]); \
+    const Operand op1 = compileExp(node->children.container[0]); \
+    const Operand result = OP_TEMP(); \
+    addCode(sentinelChunk, (Code){ \
+              .kind = C_##T, .as.binary = { \
+                .result = result, \
+                .op1 = op1, \
+                .op2 = op2 \
+              } \
+            }); \
+    return result; \
+  }
+  CODE_BINARY_CASE(ADD);
+  CODE_BINARY_CASE(SUB);
+  CODE_BINARY_CASE(MUL);
+  CODE_BINARY_CASE(DIV);
+  exit(EXIT_FAILURE);
+#undef CODE_BINARY_CASE
+}
+
+// todo check every receiver of this function, and make it free.
 // remember to free returned operand
 static Operand compileExp(const ParseTNode *node) {
   assert(node != NULL);
@@ -84,14 +123,16 @@ static Operand compileExp(const ParseTNode *node) {
     [17] = "FLOAT"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
+  if (4 <= i && i <= 7)
+    return evalArithmatic(node);
   if (i == 11 || i == 12)
     return evalFuncInvocation(node);
   if (i == 15)
-    return (Operand){.kind = VARIABLE, .value_s = my_strdup(getStrFromID(node))};
+    return (Operand){.kind = O_VARIABLE, .value_s = my_strdup(getStrFromID(node))};
   if (i == 16)
-    return (Operand){.kind = CONSTANT, .value_s = int2String(getValFromINT(node))};
+    return (Operand){.kind = O_CONSTANT, .value_s = int2String(getValFromINT(node))};
   if (i == 17)
-    return (Operand){.kind = CONSTANT, .value_s = float2String(getValFromFLOAT(node))};
+    return (Operand){.kind = O_CONSTANT, .value_s = float2String(getValFromFLOAT(node))};
 }
 
 static void compileArgs(const ParseTNode *node, Operand *stack, int *top) {
@@ -102,6 +143,10 @@ static void compileArgs(const ParseTNode *node, Operand *stack, int *top) {
     "Exp COMMA Args"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
+  if (*top >= MAX_NUM_ARGC) {
+    DEBUG_INFO("Too many arguments. Only support 20.\n");
+    exit(EXIT_FAILURE);
+  }
   stack[(*top)++] = COMPILE(node, Exp);
   if (i == 1)
     compileArgs(getChildByName(node, "Args"), stack, top);
@@ -201,16 +246,17 @@ static void compileCompSt(const ParseTNode *node) {
   COMPILE(node, StmtList);
 }
 
-static void compileParamDec(const ParseTNode *node) {
+static Operand compileParamDec(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"ParamDec") == 0);
   const char *expressions[] = {
     "Specifier VarDec"
   };
-  const int i = EXPRESSION_INDEX(node, expressions);
+  assert(EXPRESSION_INDEX(node, expressions) == 0);
+  return COMPILE(node, VarDec);
 }
 
-static void compileVarList(const ParseTNode *node) {
+static void compileVarList(const ParseTNode *node, Operand *stack, int *top) {
   assert(node != NULL);
   assert(strcmp(node->name,"VarList") == 0);
   const char *expressions[] = {
@@ -218,6 +264,13 @@ static void compileVarList(const ParseTNode *node) {
     "ParamDec COMMA VarList"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
+  if (*top >= MAX_NUM_ARGC) {
+    DEBUG_INFO("Too many arguments! Only support 20.\n");
+    exit(EXIT_FAILURE);
+  }
+  stack[(*top)++] = COMPILE(node, ParamDec);
+  if (i == 1)
+    compileVarList(getChildByName(node, "VarList"), stack, top);
 }
 
 static void compileFunDec(const ParseTNode *node) {
@@ -228,8 +281,23 @@ static void compileFunDec(const ParseTNode *node) {
     "ID LP RP"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
+  // add function name
+  addCode(sentinelChunk, (Code){
+            .kind = C_FUNCTION, .as.unary = (Operand){
+              .kind = O_FUNCTION, .value_s = my_strdup(getStrFromID(node))
+            }
+          });
+  if (i == 1) return;
+  Operand stack[MAX_NUM_ARGC];
+  int top = 0;
+  compileVarList(getChildByName(node, "VarList"), stack, &top);
+  assert(top != 0);
+  for (int j = 0; j < top; ++j) {
+    addCode(sentinelChunk, (Code){.kind = C_PARAM, .as.unary = stack[j]});
+  }
 }
 
+// return the name
 static Operand compileVarDec(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"VarDec") == 0);
@@ -240,7 +308,7 @@ static Operand compileVarDec(const ParseTNode *node) {
   const int i = EXPRESSION_INDEX(node, expressions);
 
   if (i == 1) return COMPILE(node, VarDec);
-  return (Operand){.kind = VARIABLE, .value_s = my_strdup(getStrFromID(node))};
+  return (Operand){.kind = O_VARIABLE, .value_s = my_strdup(getStrFromID(node))};
 }
 
 static void compileExtDef(const ParseTNode *node) {
@@ -251,11 +319,9 @@ static void compileExtDef(const ParseTNode *node) {
     "Specifier ExtDecList SEMI",
     "Specifier FunDec CompSt"
   };
-  const int i = EXPRESSION_INDEX(node, expressions);
-  // i == 1: guarantee that no global variables
-  if (i == 2) {
-    COMPILE(node, CompSt);
-  }
+  if (EXPRESSION_INDEX(node, expressions) != 2) return;
+  COMPILE(node, FunDec);
+  COMPILE(node, CompSt);
 }
 
 static void compileExtDefList(const ParseTNode *node) {
@@ -286,3 +352,4 @@ const Chunk* compile(const ParseTNode *root, const SymbolTable *table) {
 
 #undef COMPILE
 #undef CODE_ASSIGN
+#undef MAX_NUM_ARGC

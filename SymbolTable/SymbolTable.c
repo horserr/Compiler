@@ -226,24 +226,24 @@ static const Type* resolveExp(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"Exp") == 0);
   const char *expressions[] = {
-    "Exp ASSIGNOP Exp", // 0
-    "Exp AND Exp",      // 1
-    "Exp OR Exp",       // 2
-    "Exp RELOP Exp",    // 3
-    "Exp PLUS Exp",     // 4
-    "Exp MINUS Exp",    // 5
-    "Exp STAR Exp",     // 6
-    "Exp DIV Exp",      // 7
-    "LP Exp RP",        // 8
-    "MINUS Exp",        // 9
-    "NOT Exp",          // 10
-    "ID LP Args RP",    // 11
-    "ID LP RP",         // 12
-    "Exp LB Exp RB",    // 13
-    "Exp DOT ID",       // 14
-    "ID",               // 15
-    "INT",              // 16
-    "FLOAT"             // 17
+    [0] = "Exp ASSIGNOP Exp",
+    [1] = "Exp AND Exp",
+    [2] = "Exp OR Exp",
+    [3] = "Exp RELOP Exp",
+    [4] = "Exp PLUS Exp",
+    [5] = "Exp MINUS Exp",
+    [6] = "Exp STAR Exp",
+    [7] = "Exp DIV Exp",
+    [8] = "LP Exp RP",
+    [9] = "MINUS Exp",
+    [10] = "NOT Exp",
+    [11] = "ID LP Args RP",
+    [12] = "ID LP RP",
+    [13] = "Exp LB Exp RB",
+    [14] = "Exp DOT ID",
+    [15] = "ID",
+    [16] = "INT",
+    [17] = "FLOAT"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (i <= 7) return evalBinaryOperator(node);
