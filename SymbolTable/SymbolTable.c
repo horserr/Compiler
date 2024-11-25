@@ -161,7 +161,7 @@ static const Type* evalStruct(const ParseTNode *node) {
     return t;
   }
   // get the name of identifier
-  const char *name = getStrFromID(node);
+  const char *name = getStrFrom(node, ID);
   // loop through the field of struct
   const structFieldElement *f = expType->structure.fields;
   while (f != NULL) {
@@ -278,7 +278,7 @@ static const Type* resolveExp(const ParseTNode *node) {
   if (i == 13) return evalArray(node);
   if (i == 14) return evalStruct(node);
   if (i == 15) {
-    const char *name = getStrFromID(node);
+    const char *name = getStrFrom(node, ID);
     assert(currentEnv->kind == COMPOUND || currentEnv->kind == GLOBAL); // not in struct env
     const Data *d = searchEntireScopeWithName(currentEnv, name);
     if (d == NULL) {
@@ -609,7 +609,7 @@ static int resolveFunDec(const ParseTNode *node, ParamGather **gather, char **na
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   assert(*name == NULL); // name should be NULL when passed in
-  *name = my_strdup(getStrFromID(node));
+  *name = my_strdup(getStrFrom(node, ID));
   int num = 0;
   if (i == 0) {
     num = resolveVarList(getChildByName(node, "VarList"), gather, 1);
@@ -655,7 +655,7 @@ static const char* resolveTag(const ParseTNode *node) {
     "ID"
   };
   assert(EXPRESSION_INDEX(node, expressions) == 0);
-  return my_strdup(getStrFromID(node));
+  return my_strdup(getStrFrom(node, ID));
 }
 
 /**
@@ -671,7 +671,7 @@ static const char* resolveOptTag(const ParseTNode *node) {
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (i == 0) return randomString(5, "-struct");
-  return my_strdup(getStrFromID(node));
+  return my_strdup(getStrFrom(node, ID));
 }
 
 /**

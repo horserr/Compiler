@@ -21,7 +21,6 @@ whitespace  [ \t\r]+
 ";"     { return SEMI; }
 ","     { return COMMA; }
 "="     { return ASSIGNOP; }
-">"|"<"|">="|"<="|"=="|"!=" { return RELOP; }
 "+"     { return PLUS; }
 "-"     { return MINUS; }
 "*"     { return STAR; }
@@ -42,6 +41,11 @@ whitespace  [ \t\r]+
 "else"  { return ELSE; }
 "while" { return WHILE; }
 
+">"|"<"|">="|"<="|"=="|"!=" {
+  ValueUnion value = {.str_value = yytext};
+  yylval = createParseTNodeWithValue("RELOP", yylineno, value);
+  return RELOP;
+}
 "int"|"float" {
   ValueUnion value = {.str_value = yytext};
   yylval = createParseTNodeWithValue("TYPE", yylineno, value);

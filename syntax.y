@@ -316,7 +316,7 @@ Exp : Exp ASSIGNOP Exp {
     | Exp RELOP Exp {
             $$ = createParseTNode("Exp", @$.first_line, 0);
             addChild($$, $1);
-            addChild($$, createParseTNode("RELOP", @2.first_line, 1));
+            addChild($$, $2);
             addChild($$, $3);
         }
     | Exp PLUS Exp {

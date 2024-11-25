@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <utils.h>
+#include <bits/local_lim.h>
 
 void initChunk(Chunk **sentinel) {
   assert(*sentinel == NULL); // sentinel should be NULL at first
@@ -21,6 +22,7 @@ void addCode(Chunk *sentinel, const Code code) {
 
 static void printOp(FILE *f, const Operand *op) {
   switch (op->kind) {
+    case O_FUNCTION:
     case O_VARIABLE:
       fprintf(f, "%s ", op->value_s);
       break;
@@ -30,8 +32,9 @@ static void printOp(FILE *f, const Operand *op) {
     case O_TEM_VAR:
       fprintf(f, "t%d ", op->var_no);
       break;
-    case O_FUNCTION:
-      fprintf(f, "%s ", op->value_s);
+    case O_LABEL:
+      fprintf(f, "label%d ", op->var_no);
+      break;
     default:
       break;
   }
@@ -40,7 +43,7 @@ static void printOp(FILE *f, const Operand *op) {
 static void printCode(FILE *f, const Code *c) {
   assert(c != NULL);
   enum binary_op { ADD, SUB, MUL, DIV };
-  char b[] = {
+  const char b[] = {
     [ADD] = '+', [SUB] = '-',
     [MUL] = '*', [DIV] = '/',
   };
@@ -79,10 +82,22 @@ static void printCode(FILE *f, const Code *c) {
     case C_PARAM:
       UNARY(PARAM);
       break;
+    case C_LABEL:
+      UNARY(LABEL);
+      fprintf(f, ": ");
+      break;
     case C_ASSIGN:
       printOp(f, &c->as.assign.left);
       fprintf(f, ":= ");
       printOp(f, &c->as.assign.right);
+      break;
+    case C_IFGOTO:
+      fprintf(f, "IF ");
+      printOp(f, &c->as.ternary.x);
+      fprintf(f, "%s ", c->as.ternary.relation);
+      printOp(f, &c->as.ternary.y);
+      fprintf(f, "GOTO ");
+      printOp(f, &c->as.ternary.label);
       break;
     default:
       break;
@@ -122,9 +137,9 @@ void freeOp(const Operand *op) {
 
 // a list contains the number of operand for each kind of code
 int a[] = {
-  [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
+  [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1, [C_LABEL] = 1,
   [C_ASSIGN] = 2,
-  [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3,
+  [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3, [C_IFGOTO] = 3,
 };
 
 static void freeCode(const Code *code) {
@@ -132,6 +147,8 @@ static void freeCode(const Code *code) {
   for (int i = 0; i < a[code->kind]; ++i) {
     freeOp(op + i);
   }
+  if (code->kind == C_IFGOTO)
+    free(code->as.ternary.relation);
 }
 
 void freeChunk(const Chunk *sentinel) {

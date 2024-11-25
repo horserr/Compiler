@@ -84,7 +84,7 @@ ParseTNode* createParseTNode(const char *name, const int lineNum, const int flag
 
 // Function to copy ValueUnion
 static void copyValueUnion(ValueUnion *dest, const ValueUnion *src, const char *type) {
-  if (strcmp(type, "id") == 0) {
+  if (strcmp(type, "str") == 0) {
     dest->str_value = my_strdup(src->str_value);
   } else if (strcmp(type, "int") == 0) {
     dest->int_value = src->int_value;
@@ -104,8 +104,10 @@ ParseTNode* createParseTNodeWithValue(const char *name, const int lineNum, const
     copyValueUnion(&node->value, &value, "int");
   } else if (strcmp(name, "FLOAT") == 0) {
     copyValueUnion(&node->value, &value, "float");
-  } else if (strcmp(name, "ID") == 0 || strcmp(name, "TYPE") == 0) {
-    copyValueUnion(&node->value, &value, "id");
+  } else if (strcmp(name, "ID") == 0 ||
+             strcmp(name, "TYPE") == 0 ||
+             strcmp(name, "RELOP") == 0) {
+    copyValueUnion(&node->value, &value, "str");
   }
   return node;
 }
@@ -125,7 +127,9 @@ void freeParseTNode(ParseTNode *node) {
     return;
   }
   freeArrayList(&node->children);
-  if (strcmp(node->name, "ID") == 0 || strcmp(node->name, "TYPE") == 0) {
+  if (strcmp(node->name, "ID") == 0 ||
+      strcmp(node->name, "TYPE") == 0 ||
+      strcmp(node->name, "RELOP") == 0) {
     free(node->value.str_value);
   }
   free(node->name);

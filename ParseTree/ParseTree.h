@@ -6,8 +6,8 @@
   matchExprPattern(node, expressions, ARRAY_LEN(expressions))
 
 // extract string value from node of ID, no copy
-#define getStrFromID(node) \
-  getChildByName(node, "ID")->value.str_value
+#define getStrFrom(node, where) \
+  getChildByName(node, #where)->value.str_value
 
 // extract int value from node of INT, no copy
 #define getValFromINT(node) \

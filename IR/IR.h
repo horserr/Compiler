@@ -8,7 +8,7 @@ typedef struct Operand {
   } kind;
 
   union {
-    int var_no;              // TMP_VAR
+    int var_no;              // TMP_VAR, LABEL
     const char *value_s;     // VARIABLE, CONSTANT, FUNCTION
     struct Operand *address; // TMP_ADDR, ADDRESS
   };
@@ -17,9 +17,10 @@ typedef struct Operand {
 // a single line of code
 typedef struct {
   enum {
-    C_READ, C_WRITE, C_FUNCTION, C_PARAM, C_ARG,
+    C_READ, C_WRITE, C_FUNCTION, C_PARAM, C_ARG, C_LABEL,
     C_ASSIGN,
     C_ADD, C_SUB, C_MUL, C_DIV,
+    C_IFGOTO,
   } kind;
 
   union {
@@ -32,6 +33,13 @@ typedef struct {
     struct {
       Operand result, op1, op2;
     } binary;
+
+    struct {
+      Operand x;
+      Operand y;
+      Operand label;
+      char *relation;
+    } ternary;
   } as;
 } Code;
 
