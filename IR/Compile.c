@@ -46,13 +46,22 @@ int label_cnt = 0;
 int tmp_cnt = 0;
 
 const SymbolTable *symbolTable;
-// a list of code
 Chunk *sentinelChunk = NULL;
+
+// a handy way to get parameters information while inside `CompSt`
+struct {
+  int argc;
+  // pointing to the function type
+  Type **argv;
+  // a list of parameter name
+  char *param_s[MAX_DIMENSION];
+} funcParamInfo;
 
 static unsigned arrayTypeSize(const char *name, int depth);
 
 static void compileArgs(const ParseTNode *node, Operand *stack, int *top);
 
+// helper function of `compileExp`
 static Operand evalFuncInvocation(const ParseTNode *node) {
   const char *expressions[] = {
     "ID LP Args RP",
@@ -75,9 +84,8 @@ static Operand evalFuncInvocation(const ParseTNode *node) {
       addCode(sentinelChunk, CODE_UNARY(WRITE, stack[0]));
       return OP_CONSTANT_INT(0);
     }
-    for (int j = top - 1; j >= 0; --j) {
+    for (int j = top - 1; j >= 0; --j)
       addCode(sentinelChunk, CODE_UNARY(ARG, stack[j]));
-    }
   }
   // i == 0 or i == 1
   const Operand tmp = OP_TEMP();
@@ -162,25 +170,48 @@ static const char* gatherArrayInfo(const ParseTNode *node, int stack[], int *top
   return gatherArrayInfo(exp, stack, top);
 }
 
+// helper function of `derefArray` and `compileExp`
+static Operand evalVariable(const char *name) {
+  const char *name_copy = my_strdup(name);
+  // search in funcParamInfo
+  for (int i = 0; i < funcParamInfo.argc; ++i) {
+    if (strcmp(name, funcParamInfo.param_s[i]) != 0) continue;
+    // always return name, whether it is array or basic type.
+    return (Operand){.kind = O_VARIABLE, .value_s = name_copy};
+  }
+  const Type *type = searchWithName(symbolTable->vars, name)->variable.type;
+  assert(type->kind != ERROR);
+  // search in symbolTable
+  if (type->kind == STRUCT) {
+    DEBUG_INFO("Not implement yet.\n");
+    exit(EXIT_FAILURE);
+  }
+  if (type->kind == ARRAY) {
+    Operand *var_op = malloc(sizeof(Operand));
+    var_op->kind = O_VARIABLE;
+    var_op->value_s = name_copy;
+    return (Operand){.kind = O_REFER, .address = var_op};
+  }
+  // basic type
+  return (Operand){.kind = O_VARIABLE, .value_s = name_copy};
+}
+
 // helper function of `dereference`
 static Operand derefArray(const ParseTNode *node) {
   const char *expressions[] = {"Exp LB Exp RB"};
   assert(EXPRESSION_INDEX(node, expressions) == 0);
   int stack[STACK_MAX_NUM], top = 0;
 
-  const char *name_copy = my_strdup(gatherArrayInfo(node, stack, &top));
-  Operand *var_op = malloc(sizeof(Operand));
-  var_op->kind = O_VARIABLE;
-  var_op->value_s = name_copy;
-  const Operand base_addr_op = (Operand){.kind = O_REFER, .address = var_op};
+  const char *name = gatherArrayInfo(node, stack, &top);
+  const Operand base_addr_op = evalVariable(name);
 
   const Operand offset_op = OP_TEMP();
   addCode(sentinelChunk, CODE_ASSIGN(offset_op, OP_CONSTANT_INT(0)));
   const Operand tmp = OP_TEMP();  // no need to create a new temp variable each loop
-  for (int i = 0; i < top; ++i) { // sum all offset
+  for (int i = 0; i < top; ++i) { // sum all offsets
     addCode(sentinelChunk,
             CODE_BINARY(MUL, tmp, OP_CONSTANT_INT(stack[i]),
-                        OP_CONSTANT_INT(arrayTypeSize(name_copy, top - i))));
+                        OP_CONSTANT_INT(arrayTypeSize(name, top - i))));
     addCode(sentinelChunk, CODE_BINARY(ADD, offset_op, offset_op, tmp));
   }
 
@@ -260,7 +291,7 @@ static Operand compileExp(const ParseTNode *node) {
   if (i == 9 || i == 10)
     return dereference(node);
   if (i == 11)
-    return (Operand){.kind = O_VARIABLE, .value_s = my_strdup(getStrFrom(node, ID))};
+    return evalVariable(getStrFrom(node, ID));
   if (i == 12)
     return (Operand){.kind = O_CONSTANT, .value_s = int2String(getValFromINT(node))};
   if (i == 13)
@@ -286,7 +317,41 @@ static void compileArgs(const ParseTNode *node, Operand *stack, int *top) {
     compileArgs(getChildByName(node, "Args"), stack, top);
 }
 
-static Operand compileVarDec(const ParseTNode *node);
+/**
+ *  helper function of `compileVarDec`
+ *  @note not the copy, directly pointing to the original value.
+ */
+const char* getVariableName(const ParseTNode *node) {
+  const char *expressions[] = {
+    "ID",
+    "VarDec LB INT RB"
+  };
+  const int i = EXPRESSION_INDEX(node, expressions);
+  if (i == 0) return getStrFrom(node, ID);
+  return getVariableName(getChildByName(node, "VarDec"));
+}
+
+static Operand compileVarDec(const ParseTNode *node, const bool is_param) {
+  assert(node != NULL);
+  assert(strcmp(node->name,"VarDec") == 0);
+  const char *expressions[] = {
+    "ID",
+    "VarDec LB INT RB"
+  };
+  const int i = EXPRESSION_INDEX(node, expressions);
+  const char *name_copy = my_strdup(getVariableName(node));
+  const Operand var_op = (Operand){.kind = O_VARIABLE, .value_s = name_copy};
+
+  if (i == 0 || is_param) return var_op;
+  addCode(sentinelChunk, (Code){
+            .kind = C_DEC,
+            .as.dec = {
+              .target = var_op,
+              .size = arrayTypeSize(name_copy, 0)
+            }
+          });
+  return copyOperand(&var_op);
+}
 
 static void compileDec(const ParseTNode *node) {
   assert(node != NULL);
@@ -297,13 +362,15 @@ static void compileDec(const ParseTNode *node) {
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (i == 0) {
-    const Operand tmp = COMPILE(node, VarDec);
+    const Operand tmp =
+        compileVarDec(getChildByName(node, "VarDec"),false);
     cleanOp(&tmp);
     return;
   }
   // right first
   const Operand right = COMPILE(node, Exp);
-  const Operand left = COMPILE(node, VarDec);
+  const Operand left =
+      compileVarDec(getChildByName(node, "VarDec"),false);
   addCode(sentinelChunk, CODE_ASSIGN(left, right));
 }
 
@@ -453,13 +520,12 @@ static void compileCompSt(const ParseTNode *node) {
 static Operand compileParamDec(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"ParamDec") == 0);
-  const char *expressions[] = {
-    "Specifier VarDec"
-  };
+  const char *expressions[] = {"Specifier VarDec"};
   assert(EXPRESSION_INDEX(node, expressions) == 0);
-  return COMPILE(node, VarDec);
+  return compileVarDec(getChildByName(node, "VarDec"), true);
 }
 
+// helper function of `compileFunDec`
 static void compileVarList(const ParseTNode *node, Operand *stack, int *top) {
   assert(node != NULL);
   assert(strcmp(node->name,"VarList") == 0);
@@ -485,54 +551,26 @@ static void compileFunDec(const ParseTNode *node) {
     "ID LP RP"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
+  const char *name = getStrFrom(node, ID);
   const Operand func_op = (Operand){
-    .kind = O_VARIABLE, .value_s = my_strdup(getStrFrom(node, ID))
+    .kind = O_VARIABLE, .value_s = my_strdup(name)
   };
   addCode(sentinelChunk, CODE_UNARY(FUNCTION, func_op));
   if (i == 1) return;
+
   Operand stack[STACK_MAX_NUM];
   int top = 0;
   compileVarList(getChildByName(node, "VarList"), stack, &top);
   assert(top != 0);
+  // update funcParamInfo
+  const Data *data = searchWithName(symbolTable->funcs, name);
+  funcParamInfo.argc = data->function.argc;
+  funcParamInfo.argv = data->function.argvTypes;
   for (int j = 0; j < top; ++j) {
-    addCode(sentinelChunk, CODE_UNARY(PARAM, stack[j]));
+    const Operand var_op = stack[j];
+    addCode(sentinelChunk, CODE_UNARY(PARAM, var_op));
+    funcParamInfo.param_s[j] = my_strdup(var_op.value_s);
   }
-}
-
-/**
- *  helper function of `compileVarDec`
- *  @note not the copy, directly pointing to the original value.
- */
-const char* getVariableName(const ParseTNode *node) {
-  const char *expressions[] = {
-    "ID",
-    "VarDec LB INT RB"
-  };
-  const int i = EXPRESSION_INDEX(node, expressions);
-  if (i == 0) return getStrFrom(node, ID);
-  return getVariableName(getChildByName(node, "VarDec"));
-}
-
-static Operand compileVarDec(const ParseTNode *node) {
-  assert(node != NULL);
-  assert(strcmp(node->name,"VarDec") == 0);
-  const char *expressions[] = {
-    "ID",
-    "VarDec LB INT RB"
-  };
-  const int i = EXPRESSION_INDEX(node, expressions);
-  const char *name_copy = my_strdup(getVariableName(node));
-  const Operand var_op = (Operand){.kind = O_VARIABLE, .value_s = name_copy};
-
-  if (i == 0) return var_op;
-  addCode(sentinelChunk, (Code){
-            .kind = C_DEC,
-            .as.dec = {
-              .target = var_op,
-              .size = arrayTypeSize(name_copy, 0)
-            }
-          });
-  return copyOperand(&var_op);
 }
 
 static void compileExtDef(const ParseTNode *node) {
@@ -546,6 +584,10 @@ static void compileExtDef(const ParseTNode *node) {
   if (EXPRESSION_INDEX(node, expressions) != 2) return;
   COMPILE(node, FunDec);
   COMPILE(node, CompSt);
+  // clear funcParamInfo
+  for (int i = 0; i < funcParamInfo.argc; ++i)
+    free(funcParamInfo.param_s[i]);
+  memset(&funcParamInfo, 0, sizeof(funcParamInfo));
 }
 
 static void compileExtDefList(const ParseTNode *node) {
