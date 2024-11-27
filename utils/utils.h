@@ -16,7 +16,7 @@ char* my_strdup(const char *src);
 void reverseArray(int arr[], int size);
 const char* randomString(int len, const char *suffix);
 void error(int type, int lineNum, const char *message, ...);
-const char* int2String(const int n);
-const char* float2String(const float f);
+const char* int2String(int n);
+const char* float2String(float f);
 
 #endif

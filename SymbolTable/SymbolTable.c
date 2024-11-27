@@ -36,9 +36,9 @@ static const Type* evalBinaryOperator(const ParseTNode *node) {
     "Exp DIV Exp"       // 7
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  const Type *type1 = resolveExp(node->children.container[0]);
+  const Type *type1 = resolveExp(getChild(node, 0));
   if (type1->kind == ERROR) return type1;
-  const Type *type2 = resolveExp(node->children.container[2]);
+  const Type *type2 = resolveExp(getChild(node, 2));
   if (type2->kind == ERROR) {
     freeType((Type *) type1);
     return type2;
@@ -53,9 +53,9 @@ static const Type* evalBinaryOperator(const ParseTNode *node) {
       t->kind = ERROR;
       return t;
     }
-    if (!(nodeChildrenNameEqualHelper(node->children.container[0], "ID") ||
-          nodeChildrenNameEqualHelper(node->children.container[0], "Exp LB Exp RB") ||
-          nodeChildrenNameEqualHelper(node->children.container[0], "Exp DOT ID"))) {
+    if (!(nodeChildrenNameEqualHelper(getChild(node, 0), "ID") ||
+          nodeChildrenNameEqualHelper(getChild(node, 0), "Exp LB Exp RB") ||
+          nodeChildrenNameEqualHelper(getChild(node, 0), "Exp DOT ID"))) {
       const int lineNum = getChildByName(node, "ASSIGNOP")->lineNum;
       error(6, lineNum, "The left-hand side of an assignment must be a variable.\n");
       freeType((Type *) type1);
@@ -69,7 +69,7 @@ static const Type* evalBinaryOperator(const ParseTNode *node) {
   }
   if (1 <= i && i <= 3) { // logical operations
     if (type1->kind != INT || type2->kind != INT) {
-      const int lineNum = node->children.container[1]->lineNum;
+      const int lineNum = getChild(node, 1)->lineNum;
       error(7, lineNum, "Type mismatched for operands.\n");
       freeType((Type *) type1);
       freeType((Type *) type2);
@@ -81,7 +81,7 @@ static const Type* evalBinaryOperator(const ParseTNode *node) {
     return type2;
   } // arithmatic operations: 4 <= i && i <= 7
   if (!((type1->kind == INT || type1->kind == FLOAT) && typeEqual(type1, type2))) {
-    const int lineNum = node->children.container[1]->lineNum;
+    const int lineNum = getChild(node, 1)->lineNum;
     error(7, lineNum, "Type mismatched for operands.\n");
     freeType((Type *) type1);
     freeType((Type *) type2);
@@ -192,7 +192,7 @@ static const Type* evalArray(const ParseTNode *node) {
     "Exp LB Exp RB"
   };
   assert(EXPRESSION_INDEX(node, expressions) == 0);
-  const ParseTNode *firstExp = node->children.container[0];
+  const ParseTNode *firstExp = getChild(node, 0);
   const Type *first = resolveExp(firstExp);
   if (first->kind == ERROR) return first;
   if (first->kind != ARRAY) {
@@ -202,7 +202,7 @@ static const Type* evalArray(const ParseTNode *node) {
     t->kind = ERROR;
     return t;
   }
-  const ParseTNode *secondExp = node->children.container[2];
+  const ParseTNode *secondExp = getChild(node, 2);
   const Type *second = resolveExp(secondExp);
   if (second->kind != INT) {
     error(12, secondExp->lineNum, "is not an integer.\n");
@@ -291,7 +291,7 @@ static const Type* resolveExp(const ParseTNode *node) {
     assert(d->kind == VAR);
     return deepCopyType(d->variable.type);
   }
-  if (i == 16 || i == 17) return createBasicTypeOfNode(node->children.container[0]);
+  if (i == 16 || i == 17) return createBasicTypeOfNode(getChild(node, 0));
 }
 
 // simply gather all arguments, regardless is error or not.
@@ -488,9 +488,9 @@ static void resolveStmt(const ParseTNode *node, const Type *returnType) {
       const int lineNum = getChildByName(node, "Exp")->lineNum;
       error(7, lineNum, "Type mismatched for operands.\n");
     }
-    resolveStmt(node->children.container[4], returnType);
+    resolveStmt(getChild(node, 4), returnType);
     if (i == 4) {
-      resolveStmt(node->children.container[6], returnType);
+      resolveStmt(getChild(node, 6), returnType);
     }
   }
   freeType((Type *) expType);

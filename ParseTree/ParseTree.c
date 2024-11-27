@@ -158,7 +158,7 @@ static void print(const ParseTNode *root, const int level) {
 
   printf("%*s%s (%d)\n", level * 2, "", root->name, root->lineNum);
   for (int i = 0; i < root->children.num; i++) {
-    print(root->children.container[i], level + 1);
+    print(getChild(root, i), level + 1);
   }
 }
 
@@ -198,7 +198,7 @@ int nodeChildrenNameEqualHelper(const ParseTNode *node, const char *text) {
       free(text_copy);
       return 0;
     }
-    const char *child_name = node->children.container[i]->name;
+    const char *child_name = getChild(node, i)->name;
     if (strcmp(child_name, t) != 0) {
       // mismatch word
       free(text_copy);
@@ -219,14 +219,14 @@ int nodeChildrenNameEqualHelper(const ParseTNode *node, const char *text) {
 ParseTNode* getChildByName(const ParseTNode *parent, const char *name) {
   assert(parent != NULL);
   for (int i = 0; i < parent->children.num; ++i) {
-    ParseTNode *child = parent->children.container[i];
+    ParseTNode *child = getChild(parent, i);
     if (strcmp(child->name, name) == 0) {
       return child;
     }
   }
-  fprintf(stderr, "Wrong child name: %s. The parent node is %s\n."
-          " Checking from {ParseTree.c getChildByName}.\n",
+  fprintf(stderr, "Wrong child name: %s. The parent node is %s\n.",
           name, parent->name);
+  DEBUG_INFO("");
   exit(EXIT_FAILURE);
 }
 

@@ -1,7 +1,6 @@
 #include "Compile.h"
 
 #include <stdlib.h>
-#include <linux/limits.h>
 #ifdef LOCAL
 #include <ParseTree.h>
 #include <utils.h>
@@ -10,7 +9,7 @@
 #include "utils.h"
 #endif
 
-#define MAX_NUM_ARGC 20
+#define STACK_MAX_NUM 20
 
 #define COMPILE(root, part) \
   compile##part(getChildByName(root, #part))
@@ -22,17 +21,26 @@
       .right = right_op\
     }\
   }
+#define CODE_UNARY(T, u_op) (Code){\
+  .kind = C_##T, .as.unary = u_op\
+}
+#define CODE_BINARY(T, result_op, x, y) (Code){\
+  .kind = C_##T, .as.binary = {\
+    .result = result_op, \
+    .op1 = x,\
+    .op2 = y\
+  }\
+}
 
 #define OP_TEMP() (Operand){\
-    .kind = O_TEM_VAR, .var_no = tmp_cnt++\
-  }
+  .kind = O_TEM_VAR, .var_no = tmp_cnt++\
+}
 #define OP_LABEL() (Operand){\
-    .kind = O_LABEL, .var_no = label_cnt++\
-  }
-
-#define OP_CONSTANT_LITERAL(n) (Operand){\
-    .kind = O_CONSTANT, .value_s = my_strdup(#n)\
-  }
+  .kind = O_LABEL, .var_no = label_cnt++\
+}
+#define OP_CONSTANT_INT(value) (Operand){\
+  .kind = O_CONSTANT, .value_s = int2String(value)\
+}
 
 int label_cnt = 0;
 int tmp_cnt = 0;
@@ -40,6 +48,8 @@ int tmp_cnt = 0;
 const SymbolTable *symbolTable;
 // a list of code
 Chunk *sentinelChunk = NULL;
+
+static unsigned arrayTypeSize(const char *name, int depth);
 
 static void compileArgs(const ParseTNode *node, Operand *stack, int *top);
 
@@ -49,31 +59,43 @@ static Operand evalFuncInvocation(const ParseTNode *node) {
     "ID LP RP",
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  if (strcmp(getStrFrom(node, ID), "read") == 0) {
+  const char *func_name = getStrFrom(node, ID);
+  if (strcmp(func_name, "read") == 0) {
     assert(i == 1);
     const Operand tmp = OP_TEMP();
-    addCode(sentinelChunk, (Code){.kind = C_READ, .as.unary = tmp});
+    addCode(sentinelChunk, CODE_UNARY(READ, tmp));
     return tmp;
   }
   if (i == 0) {
-    Operand stack[MAX_NUM_ARGC]; // maximum 20 arguments
+    Operand stack[STACK_MAX_NUM]; // maximum 20 arguments
     int top = 0;
     compileArgs(getChildByName(node, "Args"), stack, &top);
-    if (strcmp(getStrFrom(node, ID), "write") == 0) {
+    if (strcmp(func_name, "write") == 0) {
       assert(top == 1);
-      addCode(sentinelChunk, (Code){.kind = C_WRITE, .as.unary = stack[0]});
-      return OP_CONSTANT_LITERAL(0);
+      addCode(sentinelChunk, CODE_UNARY(WRITE, stack[0]));
+      return OP_CONSTANT_INT(0);
     }
     for (int j = top - 1; j >= 0; --j) {
-      // todo
+      addCode(sentinelChunk, CODE_UNARY(ARG, stack[j]));
     }
   }
+  // i == 0 or i == 1
+  const Operand tmp = OP_TEMP();
+  const Operand func_op = (Operand){
+    .kind = O_INVOKE,
+    .value_s = my_strdup(func_name)
+  };
+  addCode(sentinelChunk, CODE_ASSIGN(tmp, func_op));
+  return tmp;
 }
 
 static Operand compileExp(const ParseTNode *node);
 
-static Operand evalCondition(const ParseTNode *node, const Operand *label) {
+// helper function of `evalCondition`
+static void evalCondition(const ParseTNode *node,
+                          const Operand *T_label, const Operand *F_label) {
   const char *expressions[] = {
+    // todo add single id or constant in here!!
     "Exp RELOP Exp",
     "Exp AND Exp",
     "Exp OR Exp",
@@ -81,26 +103,22 @@ static Operand evalCondition(const ParseTNode *node, const Operand *label) {
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (i == 0) {
-    const Operand tmp = OP_TEMP();
-    // first set true
-    addCode(sentinelChunk, CODE_ASSIGN(tmp, OP_CONSTANT_LITERAL(1)));
-
-    const Operand o1 = compileExp(node->children.container[0]);
-    const Operand o2 = compileExp(node->children.container[2]);
+    // todo modify this!! compileExp
+    //  there is a problem in here if( 1 ) ...
+    const Operand o1 = compileExp(getChild(node, 0));
+    const Operand o2 = compileExp(getChild(node, 2));
     addCode(sentinelChunk, (Code){
               .kind = C_IFGOTO,
               .as.ternary = {
-                .x = o1, .y = o2, .label = *label,
+                .x = o1, .y = o2, .label = *T_label,
                 .relation = my_strdup(getStrFrom(node, RELOP))
               }
             });
-    addCode(sentinelChunk, CODE_ASSIGN(tmp, OP_CONSTANT_LITERAL(0)));
-    addCode(sentinelChunk, (Code){.kind = C_LABEL, .as.unary = *label});
-    // the label will be added outside
-    return tmp;
+    addCode(sentinelChunk, CODE_UNARY(GOTO, *F_label));
   }
 }
 
+// helper function of `evalExp`
 static Operand evalArithmatic(const ParseTNode *node) {
   const char *expressions[] = {
     "Exp PLUS Exp",
@@ -112,16 +130,10 @@ static Operand evalArithmatic(const ParseTNode *node) {
   enum binary_op { ADD, SUB, MUL, DIV };
 #define CODE_BINARY_CASE(T) \
   if (i == T) { \
-    const Operand op2 = compileExp(node->children.container[2]); \
-    const Operand op1 = compileExp(node->children.container[0]); \
+    const Operand op1 = compileExp(getChild(node, 0)); \
+    const Operand op2 = compileExp(getChild(node, 2)); \
     const Operand result = OP_TEMP(); \
-    addCode(sentinelChunk, (Code){ \
-              .kind = C_##T, .as.binary = { \
-                .result = result, \
-                .op1 = op1, \
-                .op2 = op2 \
-              } \
-            }); \
+    addCode(sentinelChunk, CODE_BINARY(T, result, op1, op2)); \
     return result; \
   }
   CODE_BINARY_CASE(ADD);
@@ -132,49 +144,129 @@ static Operand evalArithmatic(const ParseTNode *node) {
 #undef CODE_BINARY_CASE
 }
 
+/**
+ *  helper function of `derefArray`
+ *  memory those index value from right to left.
+ *  @return a pointer directly pointing to string value, no copy.
+ */
+static const char* gatherArrayInfo(const ParseTNode *node, int stack[], int *top) {
+  if (*top >= STACK_MAX_NUM) {
+    DEBUG_INFO("Too much dimension. Only support 20.\n");
+    exit(EXIT_FAILURE);
+  }
+  stack[(*top)++] = getValFromINT(getChild(node, 2));
+  const ParseTNode *exp = getChild(node, 0);
+  if (nodeChildrenNameEqualHelper(exp, "ID")) {
+    return getStrFrom(exp, ID);
+  }
+  return gatherArrayInfo(exp, stack, top);
+}
+
+// helper function of `dereference`
+static Operand derefArray(const ParseTNode *node) {
+  const char *expressions[] = {"Exp LB Exp RB"};
+  assert(EXPRESSION_INDEX(node, expressions) == 0);
+  int stack[STACK_MAX_NUM], top = 0;
+
+  const char *name_copy = my_strdup(gatherArrayInfo(node, stack, &top));
+  Operand *var_op = malloc(sizeof(Operand));
+  var_op->kind = O_VARIABLE;
+  var_op->value_s = name_copy;
+  const Operand base_addr_op = (Operand){.kind = O_REFER, .address = var_op};
+
+  const Operand offset_op = OP_TEMP();
+  addCode(sentinelChunk, CODE_ASSIGN(offset_op, OP_CONSTANT_INT(0)));
+  const Operand tmp = OP_TEMP();  // no need to create a new temp variable each loop
+  for (int i = 0; i < top; ++i) { // sum all offset
+    addCode(sentinelChunk,
+            CODE_BINARY(MUL, tmp, OP_CONSTANT_INT(stack[i]),
+                        OP_CONSTANT_INT(arrayTypeSize(name_copy, top - i))));
+    addCode(sentinelChunk, CODE_BINARY(ADD, offset_op, offset_op, tmp));
+  }
+
+  const Operand result_addr_op = OP_TEMP();
+  addCode(sentinelChunk, CODE_BINARY(ADD, result_addr_op, base_addr_op, offset_op));
+
+  Operand *deref_op = malloc(sizeof(Operand));
+  *deref_op = result_addr_op; // get a copy of result_addr in heap.
+  return (Operand){.kind = O_DEREF, .address = deref_op};
+}
+
+// helper function of `dereference`
+static Operand derefStruct(const ParseTNode *node) {
+  const char *expressions[] = {"Exp DOT ID"};
+  assert(EXPRESSION_INDEX(node, expressions) == 0);
+
+  DEBUG_INFO("Not implement yet.\n");
+  exit(EXIT_FAILURE);
+}
+
+// helper function of `evalExp`
+static Operand dereference(const ParseTNode *node) {
+  const char *expressions[] = {
+    "Exp LB Exp RB",
+    "Exp DOT ID",
+  };
+  const int i = EXPRESSION_INDEX(node, expressions);
+  if (i == 0) return derefArray(node);
+  if (i == 1) return derefStruct(node);
+  DEBUG_INFO("Shouldn't reach this place.\n");
+  exit(EXIT_FAILURE);
+}
+
 // todo check every receiver of this function, and make it free.
 // remember to free returned operand
 static Operand compileExp(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"Exp") == 0);
+  // notice: remove AND, OR, RELOP, NOT. They are now inside evalCondition.
   const char *expressions[] = {
     [0] = "Exp ASSIGNOP Exp",
-    [1] = "Exp AND Exp",
-    [2] = "Exp OR Exp",
-    [3] = "Exp RELOP Exp",
-    [4] = "Exp PLUS Exp",
-    [5] = "Exp MINUS Exp",
-    [6] = "Exp STAR Exp",
-    [7] = "Exp DIV Exp",
-    [8] = "LP Exp RP",
-    [9] = "MINUS Exp",
-    [10] = "NOT Exp",
-    [11] = "ID LP Args RP",
-    [12] = "ID LP RP",
-    [13] = "Exp LB Exp RB",
-    [14] = "Exp DOT ID",
-    [15] = "ID",
-    [16] = "INT",
-    [17] = "FLOAT"
+    [1] = "Exp PLUS Exp",
+    [2] = "Exp MINUS Exp",
+    [3] = "Exp STAR Exp",
+    [4] = "Exp DIV Exp",
+    [5] = "LP Exp RP",
+    [6] = "MINUS Exp",
+    [7] = "ID LP Args RP",
+    [8] = "ID LP RP",
+    [9] = "Exp LB Exp RB",
+    [10] = "Exp DOT ID",
+    [11] = "ID",
+    [12] = "INT",
+    [13] = "FLOAT"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (i == 0) {
-    // todo
+    const Operand right = compileExp(getChild(node, 2));
+    const Operand left = compileExp(getChild(node, 0));
+    addCode(sentinelChunk, CODE_ASSIGN(left, right));
+    // if simply return right_op, this may cause double free error.
+    return copyOperand(&right);
   }
-  if (1 <= i && i <= 3)
-    return evalCondition(node, &OP_LABEL());
-  if (4 <= i && i <= 7)
+  if (1 <= i && i <= 4)
     return evalArithmatic(node);
-  if (i == 10)
-    return evalCondition(node, &OP_LABEL());
-  if (i == 11 || i == 12)
+  if (i == 5)
+    return COMPILE(node, Exp);
+  if (i == 6) {
+    const Operand right = COMPILE(node, Exp);
+    const Operand result = OP_TEMP();
+    addCode(sentinelChunk,
+            CODE_BINARY(SUB, result, OP_CONSTANT_INT(0), right));
+    return result;
+  }
+  if (i == 7 || i == 8)
     return evalFuncInvocation(node);
-  if (i == 15)
+  if (i == 9 || i == 10)
+    return dereference(node);
+  if (i == 11)
     return (Operand){.kind = O_VARIABLE, .value_s = my_strdup(getStrFrom(node, ID))};
-  if (i == 16)
+  if (i == 12)
     return (Operand){.kind = O_CONSTANT, .value_s = int2String(getValFromINT(node))};
-  if (i == 17)
+  if (i == 13)
     return (Operand){.kind = O_CONSTANT, .value_s = float2String(getValFromFLOAT(node))};
+  DEBUG_INFO("Shouldn't reach this place.\n");
+  exit(EXIT_FAILURE);
 }
 
 static void compileArgs(const ParseTNode *node, Operand *stack, int *top) {
@@ -185,7 +277,7 @@ static void compileArgs(const ParseTNode *node, Operand *stack, int *top) {
     "Exp COMMA Args"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  if (*top >= MAX_NUM_ARGC) {
+  if (*top >= STACK_MAX_NUM) {
     DEBUG_INFO("Too many arguments. Only support 20.\n");
     exit(EXIT_FAILURE);
   }
@@ -204,11 +296,15 @@ static void compileDec(const ParseTNode *node) {
     "VarDec ASSIGNOP Exp"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  if (i == 1) { // right first
-    const Operand right = COMPILE(node, Exp);
-    const Operand left = COMPILE(node, VarDec);
-    addCode(sentinelChunk, CODE_ASSIGN(left, right));
+  if (i == 0) {
+    const Operand tmp = COMPILE(node, VarDec);
+    cleanOp(&tmp);
+    return;
   }
+  // right first
+  const Operand right = COMPILE(node, Exp);
+  const Operand left = COMPILE(node, VarDec);
+  addCode(sentinelChunk, CODE_ASSIGN(left, right));
 }
 
 static void compileDecList(const ParseTNode *node) {
@@ -246,17 +342,62 @@ static void compileDefList(const ParseTNode *node) {
   COMPILE(node, DefList);
 }
 
-// helper function of `Stmt`
-static void evalBranches(const ParseTNode *node) {
+static void compileStmt(const ParseTNode *node);
+
+// helper function of `compileBranches`
+static void compileIfStmt(const ParseTNode *node) {
+  const char *expressions[] = {"IF LP Exp RP Stmt"};
+  assert(EXPRESSION_INDEX(node, expressions) == 0);
+  const Operand T_label = OP_LABEL();
+  const Operand F_label = OP_LABEL();
+  evalCondition(getChildByName(node, "Exp"), &T_label, &F_label);
+  addCode(sentinelChunk, CODE_UNARY(LABEL, T_label));
+  COMPILE(node, Stmt);
+  addCode(sentinelChunk, CODE_UNARY(LABEL, F_label));
+}
+
+// helper function of `compileBranches`
+static void compileIfElseStmt(const ParseTNode *node) {
+  const char *expressions[] = {"IF LP Exp RP Stmt ELSE Stmt"};
+  assert(EXPRESSION_INDEX(node, expressions) == 0);
+  const Operand T_label = OP_LABEL();
+  const Operand F_label = OP_LABEL();
+  evalCondition(getChildByName(node, "Exp"), &T_label, &F_label);
+  addCode(sentinelChunk, CODE_UNARY(LABEL, T_label));
+  compileStmt(getChild(node, 4));
+  const Operand jump = OP_LABEL();
+  addCode(sentinelChunk, CODE_UNARY(GOTO, jump));
+  addCode(sentinelChunk, CODE_UNARY(LABEL, F_label));
+  compileStmt(getChild(node, 6));
+  addCode(sentinelChunk, CODE_UNARY(LABEL, jump));
+}
+
+// helper function of `compileBranches`
+static void compileWhileStmt(const ParseTNode *node) {
+  const char *expressions[] = {"WHILE LP Exp RP Stmt"};
+  assert(EXPRESSION_INDEX(node, expressions) == 0);
+  const Operand start = OP_LABEL();
+  addCode(sentinelChunk, CODE_UNARY(LABEL, start));
+  const Operand T_label = OP_LABEL();
+  const Operand F_label = OP_LABEL();
+  evalCondition(getChildByName(node, "Exp"), &T_label, &F_label);
+  addCode(sentinelChunk, CODE_UNARY(LABEL, T_label));
+  COMPILE(node, Stmt);
+  addCode(sentinelChunk, CODE_UNARY(GOTO, start));
+  addCode(sentinelChunk, CODE_UNARY(LABEL, F_label));
+}
+
+// helper function of `compileStmt`
+static void compileBranches(const ParseTNode *node) {
   const char *expressions[] = {
     "IF LP Exp RP Stmt",
+    "WHILE LP Exp RP Stmt",
     "IF LP Exp RP Stmt ELSE Stmt",
-    "WHILE LP Exp RP Stmt"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  if (i == 0) {
-    evalCondition(getChildByName(node, "Exp"), &OP_LABEL());
-  }
+  if (i == 0) return compileIfStmt(node);
+  if (i == 1) return compileWhileStmt(node);
+  return compileIfElseStmt(node);
 }
 
 static void compileCompSt(const ParseTNode *node);
@@ -265,24 +406,25 @@ static void compileStmt(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"Stmt") == 0);
   const char *expressions[] = {
-    "Exp SEMI",                    // 0
-    "CompSt",                      // 1
-    "RETURN Exp SEMI",             // 2
-    "IF LP Exp RP Stmt",           // 3
-    "IF LP Exp RP Stmt ELSE Stmt", // 4
-    "WHILE LP Exp RP Stmt"         // 5
+    "CompSt",                      // 0
+    "IF LP Exp RP Stmt",           // 1
+    "IF LP Exp RP Stmt ELSE Stmt", // 2
+    "WHILE LP Exp RP Stmt",        // 3
+    "Exp SEMI",                    // 4
+    "RETURN Exp SEMI",             // 5
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  if (i == 0) {
+  if (i == 0)
+    return COMPILE(node, CompSt);
+  if (1 <= i && i <= 3)
+    return compileBranches(node);
+  if (i == 4) {
     const Operand tmp = COMPILE(node, Exp);
-    freeOp(&tmp); // may contain val_s and address in it
+    cleanOp(&tmp); // may contain val_s and address in it
     return;
   }
-  if (i == 1) return COMPILE(node, CompSt);
-  if (i == 2) {
-    // todo
-  }
-  if (3 <= i && i <= 5) return evalBranches(node);
+  const Operand tmp = COMPILE(node, Exp);
+  addCode(sentinelChunk, CODE_UNARY(RETURN, tmp));
 }
 
 static void compileStmtList(const ParseTNode *node) {
@@ -326,7 +468,7 @@ static void compileVarList(const ParseTNode *node, Operand *stack, int *top) {
     "ParamDec COMMA VarList"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  if (*top >= MAX_NUM_ARGC) {
+  if (*top >= STACK_MAX_NUM) {
     DEBUG_INFO("Too many arguments! Only support 20.\n");
     exit(EXIT_FAILURE);
   }
@@ -343,23 +485,34 @@ static void compileFunDec(const ParseTNode *node) {
     "ID LP RP"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
-  // add function name
-  addCode(sentinelChunk, (Code){
-            .kind = C_FUNCTION, .as.unary = (Operand){
-              .kind = O_FUNCTION, .value_s = my_strdup(getStrFrom(node, ID))
-            }
-          });
+  const Operand func_op = (Operand){
+    .kind = O_VARIABLE, .value_s = my_strdup(getStrFrom(node, ID))
+  };
+  addCode(sentinelChunk, CODE_UNARY(FUNCTION, func_op));
   if (i == 1) return;
-  Operand stack[MAX_NUM_ARGC];
+  Operand stack[STACK_MAX_NUM];
   int top = 0;
   compileVarList(getChildByName(node, "VarList"), stack, &top);
   assert(top != 0);
   for (int j = 0; j < top; ++j) {
-    addCode(sentinelChunk, (Code){.kind = C_PARAM, .as.unary = stack[j]});
+    addCode(sentinelChunk, CODE_UNARY(PARAM, stack[j]));
   }
 }
 
-// return the name
+/**
+ *  helper function of `compileVarDec`
+ *  @note not the copy, directly pointing to the original value.
+ */
+const char* getVariableName(const ParseTNode *node) {
+  const char *expressions[] = {
+    "ID",
+    "VarDec LB INT RB"
+  };
+  const int i = EXPRESSION_INDEX(node, expressions);
+  if (i == 0) return getStrFrom(node, ID);
+  return getVariableName(getChildByName(node, "VarDec"));
+}
+
 static Operand compileVarDec(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"VarDec") == 0);
@@ -368,9 +521,18 @@ static Operand compileVarDec(const ParseTNode *node) {
     "VarDec LB INT RB"
   };
   const int i = EXPRESSION_INDEX(node, expressions);
+  const char *name_copy = my_strdup(getVariableName(node));
+  const Operand var_op = (Operand){.kind = O_VARIABLE, .value_s = name_copy};
 
-  if (i == 1) return COMPILE(node, VarDec);
-  return (Operand){.kind = O_VARIABLE, .value_s = my_strdup(getStrFrom(node, ID))};
+  if (i == 0) return var_op;
+  addCode(sentinelChunk, (Code){
+            .kind = C_DEC,
+            .as.dec = {
+              .target = var_op,
+              .size = arrayTypeSize(name_copy, 0)
+            }
+          });
+  return copyOperand(&var_op);
 }
 
 static void compileExtDef(const ParseTNode *node) {
@@ -412,9 +574,43 @@ const Chunk* compile(const ParseTNode *root, const SymbolTable *table) {
   return sentinelChunk;
 }
 
-#undef MAX_NUM_ARGC
+#undef STACK_MAX_NUM
 #undef COMPILE
 #undef CODE_ASSIGN
+#undef CODE_UNARY
+#undef CODE_BINARY
 #undef OP_TEMP
 #undef OP_LABEL
-#undef OP_CONSTANT_LITERAL
+#undef OP_CONSTANT_INT
+
+/**
+ *  helper function of `arrayTypeSize`
+ *  @note no need to worry about alignment.
+ */
+static unsigned typeSizeHelper(const Type *type) {
+  assert(type != NULL && type->kind != ERROR);
+  if (type->kind == INT || type->kind == FLOAT) {
+    return 4;
+  }
+  if (type->kind == ARRAY)
+    return type->array.size * typeSizeHelper(type->array.elemType);
+
+  // struct
+  const structFieldElement *f = type->structure.fields;
+  unsigned size = 0;
+  while (f != NULL) {
+    size += typeSizeHelper(f->elemType);
+    f = f->next;
+  }
+  return size;
+}
+
+// return the size to be allocated
+static unsigned arrayTypeSize(const char *name, const int depth) {
+  const Type *type = searchWithName(symbolTable->vars, name)->variable.type;
+  for (int i = 0; i < depth; ++i) {
+    assert(type->kind == ARRAY); // tread over boundary.
+    type = type->array.elemType;
+  }
+  return typeSizeHelper(type);
+}

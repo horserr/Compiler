@@ -5,6 +5,9 @@
 #define EXPRESSION_INDEX(node, expressions) \
   matchExprPattern(node, expressions, ARRAY_LEN(expressions))
 
+#define getChild(node, index) \
+  node->children.container[index]
+
 // extract string value from node of ID, no copy
 #define getStrFrom(node, where) \
   getChildByName(node, #where)->value.str_value

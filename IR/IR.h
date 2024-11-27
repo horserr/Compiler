@@ -3,24 +3,26 @@
 
 typedef struct Operand {
   enum {
-    O_TEM_VAR, O_TEM_ADDR, O_VARIABLE, O_ADDRESS,
-    O_CONSTANT, O_LABEL, O_FUNCTION
+    O_TEM_VAR, O_LABEL,
+    O_VARIABLE, O_CONSTANT, O_INVOKE,
+    O_DEREF, O_REFER,
   } kind;
 
   union {
     int var_no;              // TMP_VAR, LABEL
-    const char *value_s;     // VARIABLE, CONSTANT, FUNCTION
-    struct Operand *address; // TMP_ADDR, ADDRESS
+    const char *value_s;     // VARIABLE, CONSTANT, INVOKE
+    struct Operand *address; // DEREF(dereference), REFER(reference)
   };
 } Operand;
 
 // a single line of code
 typedef struct {
   enum {
-    C_READ, C_WRITE, C_FUNCTION, C_PARAM, C_ARG, C_LABEL,
+    C_READ, C_WRITE, C_FUNCTION, C_PARAM, C_ARG, C_LABEL, C_RETURN, C_GOTO,
     C_ASSIGN,
     C_ADD, C_SUB, C_MUL, C_DIV,
     C_IFGOTO,
+    C_DEC,
   } kind;
 
   union {
@@ -36,10 +38,15 @@ typedef struct {
 
     struct {
       Operand x;
-      Operand y;
       Operand label;
+      Operand y;
       char *relation;
     } ternary;
+
+    struct {
+      Operand target;
+      unsigned size;
+    } dec;
   } as;
 } Code;
 
@@ -51,9 +58,10 @@ typedef struct Chunk {
 
 
 void initChunk(Chunk **sentinel);
+Operand copyOperand(const Operand *src);
 void addCode(Chunk *sentinel, Code code);
 void printChunk(const char *file_name, const Chunk *sentinel);
-void freeOp(const Operand *op);
+void cleanOp(const Operand *op);
 void freeChunk(const Chunk *sentinel);
 
 #endif
