@@ -2,7 +2,6 @@
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <utils.h>
 
 void initChunk(Chunk **sentinel) {
   assert(*sentinel == NULL); // sentinel should be NULL at first

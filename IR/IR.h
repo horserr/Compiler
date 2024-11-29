@@ -1,5 +1,10 @@
 #ifndef IR__H
 #define IR__H
+#ifdef LOCAL
+#include <utils.h>
+#else
+#include "utils.h"
+#endif
 
 typedef struct Operand {
   enum {

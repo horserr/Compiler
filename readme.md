@@ -1,5 +1,17 @@
 # Summary
 
+## Project 3
+
+Date: 29 Nov 2024
+
+State: Finish all basic functionalities as well as the second option which is multi-dimension array.
+
+In the duration of writing code, I refer to [this repo](https://github.dev/Unkrible/Compilers/tree/master/Project3). Thanks Unkrible!
+
+Compared with the last project where I used a myriad of `malloc` to manually create data. This time, I make use of initializer powered by C itself. What is also highly recognizable is that I leverage a huge amount of macros which season the code to be more expressive, efficient as well as tasty:).
+
+There are still something to add, when it comes to optimization. However, time is limited and I know I'm about to stop here.
+
 ## Project 2
 
 Date: 14 Nov 2024

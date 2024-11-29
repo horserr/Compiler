@@ -35,6 +35,7 @@ libraries = [
     '../ParseTree',
     '../SymbolTable',
     '../utils',
+    '../IR',
 ]
 files = [
     '../main.c',

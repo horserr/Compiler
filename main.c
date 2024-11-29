@@ -1,13 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "IR/Compile.h"
-#include "IR/IR.h"
 #ifdef LOCAL
 #include <ParseTree.h>
 #include <SymbolTable.h>
+#include "IR/Compile.h"
+#include "IR/IR.h"
 #else
 #include "ParseTree.h"
 #include "SymbolTable.h"
+#include "Compile.h"
+#include "IR.h"
 #endif
 
 #ifdef PARSER_DEBUG
