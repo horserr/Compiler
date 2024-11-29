@@ -185,7 +185,7 @@ void cleanParseTree() {
  * @param text the name or expression string as comparison target
  * @return 1 if equal; 0 not equal
 */
-int nodeChildrenNameEqualHelper(const ParseTNode *node, const char *text) {
+int nodeChildrenNamesEqual(const ParseTNode *node, const char *text) {
   assert(node != NULL);
   // compare with children names
   char *text_copy = my_strdup(text);
@@ -237,7 +237,7 @@ ParseTNode* getChildByName(const ParseTNode *parent, const char *name) {
 int matchExprPattern(const ParseTNode *node, const char *expressions[], const int length) {
   int i = 0;
   while (i < length) {
-    if (nodeChildrenNameEqualHelper(node, expressions[i])) {
+    if (nodeChildrenNamesEqual(node, expressions[i])) {
       break;
     }
     i++;

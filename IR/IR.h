@@ -4,13 +4,15 @@
 typedef struct Operand {
   enum {
     O_TEM_VAR, O_LABEL,
-    O_VARIABLE, O_CONSTANT, O_INVOKE,
+    O_CONSTANT,
+    O_VARIABLE, O_INVOKE,
     O_DEREF, O_REFER,
   } kind;
 
   union {
     int var_no;              // TMP_VAR, LABEL
-    const char *value_s;     // VARIABLE, CONSTANT, INVOKE
+    int value;               // CONSTANT
+    const char *value_s;     // VARIABLE, INVOKE
     struct Operand *address; // DEREF(dereference), REFER(reference)
   };
 } Operand;

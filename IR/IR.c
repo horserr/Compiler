@@ -25,7 +25,6 @@ Operand copyOperand(const Operand *src) {
   Operand tmp = *src;
   switch (src->kind) {
     case O_VARIABLE:
-    case O_CONSTANT:
     case O_INVOKE:
       tmp.value_s = my_strdup(src->value_s);
       break;
@@ -47,7 +46,7 @@ static void printOp(FILE *f, const Operand *op) {
       fprintf(f, "%s ", op->value_s);
       break;
     case O_CONSTANT:
-      fprintf(f, "#%s ", op->value_s);
+      fprintf(f, "#%d ", op->value);
       break;
     case O_INVOKE:
       fprintf(f, "CALL %s ", op->value_s);
@@ -165,7 +164,6 @@ void printChunk(const char *file_name, const Chunk *sentinel) {
 void cleanOp(const Operand *op) {
   switch (op->kind) {
     case O_VARIABLE:
-    case O_CONSTANT:
     case O_INVOKE:
       free((char *) op->value_s);
       break;

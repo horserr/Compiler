@@ -53,9 +53,9 @@ static const Type* evalBinaryOperator(const ParseTNode *node) {
       t->kind = ERROR;
       return t;
     }
-    if (!(nodeChildrenNameEqualHelper(getChild(node, 0), "ID") ||
-          nodeChildrenNameEqualHelper(getChild(node, 0), "Exp LB Exp RB") ||
-          nodeChildrenNameEqualHelper(getChild(node, 0), "Exp DOT ID"))) {
+    if (!(nodeChildrenNamesEqual(getChild(node, 0), "ID") ||
+          nodeChildrenNamesEqual(getChild(node, 0), "Exp LB Exp RB") ||
+          nodeChildrenNamesEqual(getChild(node, 0), "Exp DOT ID"))) {
       const int lineNum = getChildByName(node, "ASSIGNOP")->lineNum;
       error(6, lineNum, "The left-hand side of an assignment must be a variable.\n");
       freeType((Type *) type1);

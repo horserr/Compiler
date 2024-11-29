@@ -53,7 +53,7 @@ void printParseTRoot();
 void cleanParseTree();
 
 // utility function
-int nodeChildrenNameEqualHelper(const ParseTNode *node, const char *text);
+int nodeChildrenNamesEqual(const ParseTNode *node, const char *text);
 ParseTNode* getChildByName(const ParseTNode *parent, const char *name);
 int matchExprPattern(const ParseTNode *node, const char *expressions[], const int length);
 
