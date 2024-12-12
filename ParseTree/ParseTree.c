@@ -1,8 +1,8 @@
-#include "ParseTree.h"
-
 #ifdef LOCAL
+#include <ParseTree.h>
 #include <utils.h>
 #else
+#include "ParseTree.h"
 #include "utils.h"
 #endif
 

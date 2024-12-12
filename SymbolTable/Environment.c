@@ -1,8 +1,10 @@
+#ifdef LOCAL
+#include <Environment.h>
+#include <utils.h>
+#else
 #include "Environment.h"
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "utils.h"
+#endif
 
 Environment* newEnvironment(Environment *parent, const EnvKind kind) {
   Environment *env = malloc(sizeof(Environment));

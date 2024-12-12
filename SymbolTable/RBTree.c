@@ -4,17 +4,13 @@ This code is provided by @author costheta_z
     C implementation for Red-Black Tree Insertion.
     visit https://www.geeksforgeeks.org/introduction-to-red-black-tree/?ref=header_outind for more information
 **/
-#include "RBTree.h"
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #ifdef LOCAL
+#include <RBTree.h>
 #include <utils.h>
 #else
 #include "utils.h"
+#include "RBTree.h"
 #endif
-
 
 ///// Red Black Tree /////////////////////////////////////////
 // Node structure for the Red-Black Tree

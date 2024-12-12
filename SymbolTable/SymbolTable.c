@@ -1,9 +1,10 @@
+#ifdef LOCAL
+#include <SymbolTable.h>
+#include <utils.h>
+#else
 #include "SymbolTable.h"
-#include <assert.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "utils.h"
+#endif
 
 #define INSERT_VAR(data) \
   do {\

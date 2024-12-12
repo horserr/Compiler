@@ -1,13 +1,14 @@
 #ifndef ENVIRONMENT
 #define ENVIRONMENT
 
-#include "RBTree.h"
 #ifdef LOCAL
+// todo don't understand why
+// #include <ParseTree.h>
 #include "../ParseTree/ParseTree.h"
-#include "../utils/utils.h"
+#include <RBTree.h>
 #else
 #include "ParseTree.h"
-#include "utils.h"
+#include "RBTree.h"
 #endif
 
 

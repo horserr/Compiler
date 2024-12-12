@@ -1,4 +1,8 @@
+#ifdef LOCAL
+#include <Compile.h>
+#else
 #include "Compile.h"
+#endif
 
 #define STACK_MAX_NUM 20
 

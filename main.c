@@ -1,5 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
 #ifdef LOCAL
 #include <Compile.h>
 #include <IR.h>
@@ -69,11 +67,12 @@ int main(const int argc, char **argv) {
 
   const SymbolTable *table = buildTable(root);
   const Chunk *chunk = compile(root, table);
+  optimize(chunk);
+
 #ifdef LOCAL
   printChunk("test/out/out.ir", chunk);
 #endif
 
-  optimize(chunk);
   printMIPS(argv[2], chunk);
 
   freeChunk(chunk);

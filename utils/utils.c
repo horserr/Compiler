@@ -1,6 +1,10 @@
-#include "utils.h"
 #include <ctype.h>
 #include <time.h>
+#ifdef LOCAL
+#include <utils.h>
+#else
+#include "utils.h"
+#endif
 
 // utility to duplicate a string
 char* my_strdup(const char *src) {

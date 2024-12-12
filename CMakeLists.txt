@@ -64,7 +64,7 @@ target_link_libraries(${PROJECT_NAME}
                       PARSE_TREE
                       SymbolTable
                       IR
-                      MIPS
+                      MIPS Optimize
                       ${FLEX_LIBRARIES}
                       ${BISON_LIBRARIES}
                       sanitizer_flags

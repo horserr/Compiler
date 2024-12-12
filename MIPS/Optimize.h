@@ -4,6 +4,7 @@
 #include <IR.h>
 #include <utils.h>
 #else
+#include "IR.h"
 #include "utils.h"
 #endif
 

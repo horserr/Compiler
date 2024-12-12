@@ -1,4 +1,8 @@
+#ifdef LOCAL
+#include <IR.h>
+#else
 #include "IR.h"
+#endif
 
 void initChunk(Chunk **sentinel) {
   assert(*sentinel == NULL); // sentinel should be NULL at first
@@ -69,7 +73,7 @@ static void printOp(FILE *f, const Operand *op) {
 static void printCode(FILE *f, const Code *c) {
   assert(c != NULL);
   enum binary_op { ADD, SUB, MUL, DIV };
-  const char b[] = {
+  static const char b[] = {
     [ADD] = '+', [SUB] = '-',
     [MUL] = '*', [DIV] = '/',
   };
@@ -173,16 +177,16 @@ void cleanOp(const Operand *op) {
   }
 }
 
-// a list contains the number of operand for each kind of code
-int a[] = {
-  [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
-  [C_LABEL] = 1, [C_RETURN] = 1, [C_GOTO] = 1, [C_ARG] = 1,
-  [C_ASSIGN] = 2,
-  [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3, [C_IFGOTO] = 3,
-  [C_DEC] = 1,
-};
-
 static void cleanCode(const Code *code) {
+  // a list contains the number of operands for each kind of code
+  static const int a[] = {
+    [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
+    [C_LABEL] = 1, [C_RETURN] = 1, [C_GOTO] = 1, [C_ARG] = 1,
+    [C_ASSIGN] = 2,
+    [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3, [C_IFGOTO] = 3,
+    [C_DEC] = 1,
+  };
+
   const Operand *op = (Operand *) &code->as;
   for (int i = 0; i < a[code->kind]; ++i) {
     cleanOp(op + i);
