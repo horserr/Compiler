@@ -1,8 +1,4 @@
 #include "ParseTree.h"
-#include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #ifdef LOCAL
 #include <utils.h>

@@ -1,15 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #ifdef LOCAL
+#include <Compile.h>
+#include <IR.h>
+#include <Morph.h>
+#include <Optimize.h>
 #include <ParseTree.h>
 #include <SymbolTable.h>
-#include "IR/Compile.h"
-#include "IR/IR.h"
 #else
 #include "ParseTree.h"
 #include "SymbolTable.h"
 #include "Compile.h"
 #include "IR.h"
+#include "Optimize.h"
+#include "Morph.h"
 #endif
 
 #ifdef PARSER_DEBUG
@@ -38,6 +42,10 @@ int parse() {
 }
 
 int main(const int argc, char **argv) {
+  if (argc != 3) {
+    DEBUG_INFO("Arguments should be input test file and **output** file.\n");
+    return 0;
+  }
   FILE *f = fopen(argv[1], "r");
   if (!f) {
     perror(argv[1]);
@@ -51,21 +59,22 @@ int main(const int argc, char **argv) {
 #ifdef LOCAL
   // Redirect stdout to the output file
   if (freopen("test/out/out.txt", "w", stdout) == NULL) {
-    DEBUG_INFO("Something wrong while redirect stdout.\n");
+    DEBUG_INFO("Something wrong while redirecting stdout.\n");
     exit(EXIT_FAILURE);
   }
   printParseTRoot();
-  // revert stdout to terminal
+  // redirect stdout to terminal
   freopen("/dev/tty", "w", stdout);
 #endif
-  const SymbolTable *table = buildTable(root);
 
-  if (argc != 3) {
-    DEBUG_INFO("Arguments should be input test file and **output** file.\n");
-    return 0;
-  }
+  const SymbolTable *table = buildTable(root);
   const Chunk *chunk = compile(root, table);
-  printChunk(argv[2], chunk);
+#ifdef LOCAL
+  printChunk("test/out/out.ir", chunk);
+#endif
+
+  optimize(chunk);
+  printMIPS(argv[2], chunk);
 
   freeChunk(chunk);
   freeTable((SymbolTable *) table);

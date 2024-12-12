@@ -2,13 +2,19 @@
 #define UTILITIES
 
 #include <assert.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
-#define DEBUG_INFO(message) \
-  fprintf(stderr, "%sChecking from {%s :%d @%s}.\n",\
-    message, __FILE__, __LINE__, __FUNCTION__)
+#define DEBUG_INFO(message...) \
+  do {\
+    fprintf(stderr, message); \
+    fprintf(stderr, "Checking from {%s :%d @%s}.\n",\
+      __FILE__, __LINE__, __FUNCTION__);\
+  } while(false)
+
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 

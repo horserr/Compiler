@@ -1,14 +1,5 @@
 #include "Compile.h"
 
-#include <stdlib.h>
-#ifdef LOCAL
-#include <ParseTree.h>
-#include <utils.h>
-#else
-#include "ParseTree.h"
-#include "utils.h"
-#endif
-
 #define STACK_MAX_NUM 20
 
 #define COMPILE(root, part) \

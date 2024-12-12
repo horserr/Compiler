@@ -4,4 +4,3 @@ test/
 .vscode/
 deploy/
 !test/test.py
-!deploy/deploy.py

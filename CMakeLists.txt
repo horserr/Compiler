@@ -7,7 +7,6 @@ option(PARSE_TREE_TEST "test PARSE TREE date structure" OFF)
 option(PARSER_DEBUG "debug parser with output file and debug mode being set" OFF)
 option(SYMBOL_TEST "test symbol table" ON)
 
-# todo add sanitizer flags in debug mode and git
 # Set sanitizer flags
 set(SANITIZER_FLAGS "-fsanitize=address")
 set(DEBUG_FLAGS "-g")
@@ -24,6 +23,7 @@ add_subdirectory(utils)
 add_subdirectory(ParseTree)
 add_subdirectory(SymbolTable)
 add_subdirectory(IR)
+add_subdirectory(MIPS)
 
 # Create a library with sanitizer flags
 add_library(sanitizer_flags INTERFACE)
@@ -64,6 +64,7 @@ target_link_libraries(${PROJECT_NAME}
                       PARSE_TREE
                       SymbolTable
                       IR
+                      MIPS
                       ${FLEX_LIBRARIES}
                       ${BISON_LIBRARIES}
                       sanitizer_flags
