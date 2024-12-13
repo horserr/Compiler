@@ -23,19 +23,12 @@ void addCode(Chunk *sentinel, const Code code) {
 // deep copy an operand, especially those pointer value.
 Operand copyOperand(const Operand *src) {
   Operand tmp = *src;
-  switch (src->kind) {
-    case O_VARIABLE:
-    case O_INVOKE:
-      tmp.value_s = my_strdup(src->value_s);
-      break;
-    case O_REFER:
-    case O_DEREF: {
-      Operand *addr_op = malloc(sizeof(Operand));
-      *addr_op = copyOperand(src->address);
-      tmp.address = addr_op;
-      break;
-    }
-    default: break;
+  if (in(src->kind, 2, O_VARIABLE, O_INVOKE)) {
+    tmp.value_s = my_strdup(src->value_s);
+  } else if (in(src->kind, 2, O_REFER, O_DEREF)) {
+    Operand *addr_op = malloc(sizeof(Operand));
+    *addr_op = copyOperand(src->address);
+    tmp.address = addr_op;
   }
   return tmp;
 }
@@ -162,18 +155,12 @@ void printChunk(const char *file_name, const Chunk *sentinel) {
 }
 
 void cleanOp(const Operand *op) {
-  switch (op->kind) {
-    case O_VARIABLE:
-    case O_INVOKE:
-      free((char *) op->value_s);
-      break;
-    case O_REFER:
-    case O_DEREF:
-      cleanOp(op->address);
-      free(op->address);
-      break;
-    default:
-      break;
+  if (in(op->kind, 2, O_VARIABLE, O_INVOKE))
+    return free((char *) op->value_s);
+
+  if (in(op->kind, 2, O_REFER, O_DEREF)) {
+    cleanOp(op->address);
+    free(op->address);
   }
 }
 

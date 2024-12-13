@@ -81,3 +81,16 @@ const char* float2String(const float f) {
   sprintf(buffer, "%f", f);
   return my_strdup(buffer);
 }
+
+bool in(const int target, const int num, ...) {
+  va_list args;
+  va_start(args, num);
+  for (int i = 0; i < num; ++i) {
+    if (target == va_arg(args, int)) {
+      va_end(args);
+      return true;
+    }
+  }
+  va_end(args);
+  return false;
+}

@@ -194,7 +194,7 @@ static Operand evalArithmatic(const ParseTNode *node) {
  */
 static const char* gatherArrayInfo(const ParseTNode *node, Operand stack[], int *top) {
   if (*top >= STACK_MAX_NUM) {
-    DEBUG_INFO("Too much dimension. Only support 20.\n");
+    DEBUG_INFO("Too much dimension. Only support %d.\n", STACK_MAX_NUM);
     exit(EXIT_FAILURE);
   }
 
@@ -354,7 +354,7 @@ static void compileArgs(const ParseTNode *node, Operand *stack, int *top) {
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (*top >= STACK_MAX_NUM) {
-    DEBUG_INFO("Too many arguments. Only support 20.\n");
+    DEBUG_INFO("Too many arguments. Only support %d.\n", STACK_MAX_NUM);
     exit(EXIT_FAILURE);
   }
   stack[(*top)++] = COMPILE(node, Exp);
@@ -580,7 +580,7 @@ static void compileVarList(const ParseTNode *node, Operand *stack, int *top) {
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   if (*top >= STACK_MAX_NUM) {
-    DEBUG_INFO("Too many arguments! Only support 20.\n");
+    DEBUG_INFO("Too many arguments! Only support %d.\n", STACK_MAX_NUM);
     exit(EXIT_FAILURE);
   }
   stack[(*top)++] = COMPILE(node, ParamDec);

@@ -12,17 +12,24 @@ static void printUnary(const char *name, const char *reg);
 static void printBinary(const char *name, const char *reg1, const char *reg2);
 static void printTernary(const char *name, const char *result,
                          const char *reg1, const char *reg2);
+
 FILE *f = NULL;
 
 static const char* getReg(const Operand *op) {
   static const char *regsPool[] = {
-    "$zero",
+    "m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "m13",
     "$v0", "$v1",
     "$a0", "$a1", "$a2", "$a3",
     "$t0", "$t1", "$t2", "$t3", "$t4", "$t5", "$t6", "$t7", "$t8", "$t9",
     "$s0", "$s1", "$s2", "$s3", "$s4", "$s5", "$s6", "$s7",
-    "$sp", "$fp", "$ra"
+    "$sp", "$fp", "$ra", "$zero",
   };
+  if (op->kind == O_CONSTANT) {
+    char *im = (char *) int2String(op->value);
+    printBinary("li", "t0", im);
+    free(im);
+    return regsPool[20];
+  }
   // todo temporary try
   static int i = 1;
   return regsPool[i++];
@@ -31,6 +38,11 @@ static const char* getReg(const Operand *op) {
 static void printLABEL(const Code *code) {
   assert(code->kind == C_LABEL);
   fprintf(f, "label%d:\n", code->as.unary.var_no);
+}
+
+static void printFUNCTION(const Code *code) {
+  assert(code->kind == C_FUNCTION);
+  fprintf(f, "%s:\n", code->as.unary.value_s);
 }
 
 static void printASSIGN(const Code *code) {
@@ -44,7 +56,46 @@ static void printADD(const Code *code) {
   assert(code->kind == C_ADD);
   const Operand *op1 = &code->as.binary.op1;
   const Operand *op2 = &code->as.binary.op2;
+  // can't be constant at the same time
+  assert(op1->kind != O_CONSTANT || op2->kind != O_CONSTANT);
   const Operand *result = &code->as.binary.result;
+  if (op1->kind != O_CONSTANT && op2->kind != O_CONSTANT)
+    return printTernary("add", getReg(result),
+                        getReg(op1), getReg(op2));
+
+  if (op1->kind == O_CONSTANT)
+    swap(Operand*, op1, op2);
+  char *immediate = (char *) int2String(op2->value);
+  printTernary("addi", getReg(result), getReg(op1), immediate);
+  free(immediate);
+}
+
+static void printSUB(const Code *code) {
+  assert(code->kind == C_SUB);
+  const Operand *op1 = &code->as.binary.op1;
+  const Operand *op2 = &code->as.binary.op2;
+  const Operand *result = &code->as.binary.result;
+  // the second operand can't be constant, as it has been changed to 'ADD'
+  // with the aid of `organizeOpSequence`
+  assert(op2->kind != O_CONSTANT);
+  printTernary("sub", getReg(result), getReg(op1), getReg(op2));
+}
+
+static void printDIV(const Code *code) {
+  assert(code->kind == C_DIV);
+  const char *op1_reg = getReg(&code->as.binary.op1);
+  const char *op2_reg = getReg(&code->as.binary.op2);
+  printBinary("div", op1_reg, op2_reg);
+  const char *result_reg = getReg(&code->as.binary.result);
+  printUnary("mflo", result_reg);
+}
+
+static void printMUL(const Code *code) {
+  assert(code->kind == C_MUL);
+  const char *result_reg = getReg(&code->as.binary.result);
+  const char *op1_reg = getReg(&code->as.binary.op1);
+  const char *op2_reg = getReg(&code->as.binary.op2);
+  printTernary("mul", result_reg, op1_reg, op2_reg);
 }
 
 static void printREAD(const Code *code) {
@@ -57,10 +108,16 @@ static void printREAD(const Code *code) {
 static void printCode(const Code *code) {
 #define elem(T) [C_##T] = print##T
   static const FuncPtr printTable[] = {
-    elem(ASSIGN)
+    elem(ASSIGN), elem(ADD), elem(SUB), elem(MUL), elem(DIV),
+    elem(FUNCTION),
   };
   // todo remove this
-  if (code->kind != C_ASSIGN) return;
+  if (!in(code->kind,
+          5,
+          // C_ASSIGN,
+          C_ADD, C_SUB, C_MUL, C_DIV,
+          C_FUNCTION))
+    return;
 
   printTable[code->kind](code);
 #undef elem

@@ -15,8 +15,14 @@
       __FILE__, __LINE__, __FUNCTION__);\
   } while(false)
 
-
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
+
+#define swap(T, a, b) \
+  do {\
+    T temp_ = a;\
+    a = b;\
+    b = temp_;\
+  } while (false)
 
 char* my_strdup(const char *src);
 void reverseArray(int arr[], int size);
@@ -24,5 +30,6 @@ const char* randomString(int len, const char *suffix);
 void error(int type, int lineNum, const char *message, ...);
 const char* int2String(int n);
 const char* float2String(float f);
+bool in(int target, int num, ...);
 
 #endif
