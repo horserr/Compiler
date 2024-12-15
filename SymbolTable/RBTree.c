@@ -304,9 +304,9 @@ const char* typeToString(const Type *type) {
     case FLOAT: return my_strdup("T: float ");
     case ARRAY: return my_strdup("T: array ");
     case STRUCT: {
-      char buffer[50];
-      sprintf(buffer, "T: struct, name: %s ", type->structure.struct_name);
-      return my_strdup(buffer);
+      char *s;
+      asprintf(&s, "T: struct, name: %s ", type->structure.struct_name);
+      return s;
     }
     default: return my_strdup("**UNKNOWN TYPE**");
   }

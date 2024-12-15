@@ -67,9 +67,9 @@ void error(const int type, const int lineNum, const char *message, ...) {
  * @note remember to free.
  */
 const char* int2String(const int n) {
-  char buffer[30];
-  sprintf(buffer, "%d", n);
-  return my_strdup(buffer);
+  char *s;
+  asprintf(&s, "%d", n);
+  return s;
 }
 
 /**
@@ -77,9 +77,9 @@ const char* int2String(const int n) {
  * @note remember to free.
  */
 const char* float2String(const float f) {
-  char buffer[30];
-  sprintf(buffer, "%f", f);
-  return my_strdup(buffer);
+  char *s;
+  asprintf(&s, "%f",f);
+  return s;
 }
 
 bool in(const int target, const int num, ...) {

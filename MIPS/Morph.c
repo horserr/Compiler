@@ -7,16 +7,31 @@
 #endif
 
 typedef void (*FuncPtr)(const Code *);
+typedef const char *RegType;
 
-static void printUnary(const char *name, const char *reg);
-static void printBinary(const char *name, const char *reg1, const char *reg2);
-static void printTernary(const char *name, const char *result,
-                         const char *reg1, const char *reg2);
+static void printUnary(const char *name, RegType reg);
+static void printBinary(const char *name, RegType reg1, RegType reg2);
+static void printTernary(const char *name, RegType result,
+                         RegType reg1, RegType reg2);
 
 FILE *f = NULL;
 
-static const char* getReg(const Operand *op) {
-  static const char *regsPool[] = {
+static void printLoadImm(const RegType reg, const int val) {
+  char *im = (char *) int2String(val);
+  printBinary("li", reg, im);
+  free(im);
+}
+
+static void printSaveOrLoad(const char *T, const RegType reg,
+                            const unsigned offset, const RegType base_reg) {
+  assert(strcmp(T, "sw") == 0 || strcmp(T, "lw") == 0);
+  char buffer[20];
+  sprintf(buffer, "%u(%s)", offset, base_reg);
+  printBinary(T, reg, buffer);
+}
+
+static RegType getReg(const Operand *op) {
+  static const RegType regsPool[] = {
     "m0", "m1", "m2", "m3", "m4", "m5", "m6", "m7", "m8", "m9", "m10", "m11", "m12", "m13",
     "$v0", "$v1",
     "$a0", "$a1", "$a2", "$a3",
@@ -25,9 +40,7 @@ static const char* getReg(const Operand *op) {
     "$sp", "$fp", "$ra", "$zero",
   };
   if (op->kind == O_CONSTANT) {
-    char *im = (char *) int2String(op->value);
-    printBinary("li", "t0", im);
-    free(im);
+    printLoadImm("t0", op->value);
     return regsPool[20];
   }
   // todo temporary try
@@ -45,11 +58,70 @@ static void printFUNCTION(const Code *code) {
   fprintf(f, "%s:\n", code->as.unary.value_s);
 }
 
+static void printGOTO(const Code *code) {
+  assert(code->kind == C_GOTO);
+  char buffer[20];
+  sprintf(buffer, "label%d", code->as.unary.var_no);
+  printUnary("j", buffer);
+}
+
+static void printRETURN(const Code *code) {
+  assert(code->kind == C_RETURN);
+  printBinary("move", "$v0", getReg(&code->as.unary));
+  printUnary("jr", "$ra");
+}
+
+static void printIFGOTO(const Code *code) {
+  assert(code->kind == C_IFGOTO);
+#define elem(s, m) { #s, #m }
+  const struct {
+    const char *symbol;
+    const char *mnemonic;
+  } map[] = {
+        elem(==, beq), elem(!=, bne), elem(>, bgt),
+        elem(<, blt), elem(>=, bge), elem(<=, ble),
+      };
+#undef elem
+  // todo bsearch
+  // search in map
+  const char *name = NULL;
+  for (int i = 0; i < ARRAY_LEN(map); ++i) {
+    if (strcmp(map[i].symbol, code->as.ternary.relation) == 0) {
+      name = map[i].mnemonic;
+      break;
+    }
+  }
+  assert(name != NULL);
+  char *label;
+  asprintf(&label, "label%d", code->as.ternary.label.var_no);
+  printTernary(name, getReg(&code->as.ternary.x),
+               getReg(&code->as.ternary.y), label);
+  free(label);
+}
+
 static void printASSIGN(const Code *code) {
   assert(code->kind == C_ASSIGN);
-  const char *x = getReg(&code->as.assign.left);
-  const char *y = getReg(&code->as.assign.right);
-  printBinary("move", x, y);
+  const Operand *right = &code->as.assign.right;
+  assert(right->kind != O_REFER);
+  if (right->kind == O_CONSTANT) {
+    printLoadImm("t1", right->value);
+    return;
+  }
+
+  const Operand *left = &code->as.assign.left;
+  const RegType left_reg = getReg(left);
+  const RegType right_reg = getReg(right);
+
+  assert(!(left->kind == O_DEREF && right->kind == O_DEREF));
+  if (left->kind == O_DEREF) {
+    printSaveOrLoad("sw", left_reg, 0, right_reg);
+    return;
+  }
+  if (right->kind == O_DEREF) {
+    printSaveOrLoad("lw", left_reg, 0, right_reg);
+    return;
+  }
+  printBinary("move", left_reg, right_reg);
 }
 
 static void printADD(const Code *code) {
@@ -63,8 +135,8 @@ static void printADD(const Code *code) {
     return printTernary("add", getReg(result),
                         getReg(op1), getReg(op2));
 
-  if (op1->kind == O_CONSTANT)
-    swap(Operand*, op1, op2);
+  if (op1->kind == O_CONSTANT) swap(op1, op2);
+
   char *immediate = (char *) int2String(op2->value);
   printTernary("addi", getReg(result), getReg(op1), immediate);
   free(immediate);
@@ -83,44 +155,38 @@ static void printSUB(const Code *code) {
 
 static void printDIV(const Code *code) {
   assert(code->kind == C_DIV);
-  const char *op1_reg = getReg(&code->as.binary.op1);
-  const char *op2_reg = getReg(&code->as.binary.op2);
+  const RegType op1_reg = getReg(&code->as.binary.op1);
+  const RegType op2_reg = getReg(&code->as.binary.op2);
   printBinary("div", op1_reg, op2_reg);
-  const char *result_reg = getReg(&code->as.binary.result);
+  const RegType result_reg = getReg(&code->as.binary.result);
   printUnary("mflo", result_reg);
 }
 
 static void printMUL(const Code *code) {
   assert(code->kind == C_MUL);
-  const char *result_reg = getReg(&code->as.binary.result);
-  const char *op1_reg = getReg(&code->as.binary.op1);
-  const char *op2_reg = getReg(&code->as.binary.op2);
+  const RegType result_reg = getReg(&code->as.binary.result);
+  const RegType op1_reg = getReg(&code->as.binary.op1);
+  const RegType op2_reg = getReg(&code->as.binary.op2);
   printTernary("mul", result_reg, op1_reg, op2_reg);
-}
-
-static void printREAD(const Code *code) {
-  assert(code->kind == C_READ);
-  // todo modify this
-  // terniary
-  fprintf(f, "\t subu $sp, $sp, 4\n");
 }
 
 static void printCode(const Code *code) {
 #define elem(T) [C_##T] = print##T
-  static const FuncPtr printTable[] = {
+  const FuncPtr printTable[] = {
     elem(ASSIGN), elem(ADD), elem(SUB), elem(MUL), elem(DIV),
-    elem(FUNCTION),
+    elem(FUNCTION), elem(GOTO), elem(LABEL), elem(RETURN),
+    elem(IFGOTO),
   };
+#undef elem
   // todo remove this
   if (!in(code->kind,
-          5,
-          // C_ASSIGN,
+          6,
+          C_ASSIGN,
           C_ADD, C_SUB, C_MUL, C_DIV,
           C_FUNCTION))
     return;
 
   printTable[code->kind](code);
-#undef elem
 }
 
 static void initialize() {
@@ -175,15 +241,15 @@ void printMIPS(const char *file_name, const Chunk *sentinel) {
   fclose(f);
 }
 
-static void printUnary(const char *name, const char *reg) {
+static void printUnary(const char *name, const RegType reg) {
   fprintf(f, "\t%s %s\n", name, reg);
 }
 
-static void printBinary(const char *name, const char *reg1, const char *reg2) {
+static void printBinary(const char *name, const RegType reg1, const RegType reg2) {
   fprintf(f, "\t%s %s, %s\n", name, reg1, reg2);
 }
 
-static void printTernary(const char *name, const char *result,
-                         const char *reg1, const char *reg2) {
+static void printTernary(const char *name, const RegType result,
+                         const RegType reg1, const RegType reg2) {
   fprintf(f, "\t%s %s, %s, %s\n", name, result, reg1, reg2);
 }

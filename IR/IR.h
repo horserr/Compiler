@@ -70,6 +70,7 @@ Operand copyOperand(const Operand *src);
 void addCode(Chunk *sentinel, Code code);
 void printChunk(const char *file_name, const Chunk *sentinel);
 void cleanOp(const Operand *op);
+void removeCode(Chunk *chunk);
 void freeChunk(const Chunk *sentinel);
 
 #endif

@@ -182,14 +182,23 @@ static void cleanCode(const Code *code) {
     free(code->as.ternary.relation);
 }
 
+void removeCode(Chunk *chunk) {
+  // can't be the sentinel node
+  assert(chunk->prev != chunk && chunk != chunk->next);
+  Chunk *prev = chunk->prev;
+  Chunk *next = chunk->next;
+  prev->next = next;
+  next->prev = prev;
+  cleanCode(&chunk->code);
+  free(chunk);
+}
+
 void freeChunk(const Chunk *sentinel) {
   assert(sentinel != NULL);
   Chunk *c = sentinel->next;
   while (c != sentinel) {
-    Chunk *tmp = c;
     c = c->next;
-    cleanCode(&tmp->code);
-    free(tmp);
+    removeCode(c->prev);
   }
   free(c);
 }

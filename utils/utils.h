@@ -8,8 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DEBUG_INFO(message...) \
-  do {\
+#define DEBUG_INFO(message...) do {\
     fprintf(stderr, message); \
     fprintf(stderr, "Checking from {%s :%d @%s}.\n",\
       __FILE__, __LINE__, __FUNCTION__);\
@@ -17,9 +16,8 @@
 
 #define ARRAY_LEN(array) (sizeof(array) / sizeof((array)[0]))
 
-#define swap(T, a, b) \
-  do {\
-    T temp_ = a;\
+#define swap(a, b) do {\
+    typeof(a) temp_ = a;\
     a = b;\
     b = temp_;\
   } while (false)
