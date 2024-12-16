@@ -68,6 +68,7 @@ typedef struct Chunk {
 void initChunk(Chunk **sentinel);
 Operand copyOperand(const Operand *src);
 void addCode(Chunk *sentinel, Code code);
+void printCode(FILE *f, const Code *c);
 void printChunk(const char *file_name, const Chunk *sentinel);
 void cleanOp(const Operand *op);
 void removeCode(Chunk *chunk);

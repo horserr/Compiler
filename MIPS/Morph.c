@@ -170,7 +170,7 @@ static void printMUL(const Code *code) {
   printTernary("mul", result_reg, op1_reg, op2_reg);
 }
 
-static void printCode(const Code *code) {
+static void printIR(const Code *code) {
 #define elem(T) [C_##T] = print##T
   const FuncPtr printTable[] = {
     elem(ASSIGN), elem(ADD), elem(SUB), elem(MUL), elem(DIV),
@@ -235,7 +235,7 @@ void printMIPS(const char *file_name, const Chunk *sentinel) {
   // initialize();
   const Chunk *c = sentinel->next;
   while (c != sentinel) {
-    printCode(&c->code);
+    printIR(&c->code);
     c = c->next;
   }
   fclose(f);

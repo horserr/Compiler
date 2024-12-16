@@ -29,5 +29,6 @@ void error(int type, int lineNum, const char *message, ...);
 const char* int2String(int n);
 const char* float2String(float f);
 bool in(int target, int num, ...);
+int cmp_int(const void *a, const void *b);
 
 #endif

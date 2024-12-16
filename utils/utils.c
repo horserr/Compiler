@@ -8,25 +8,17 @@
 
 // utility to duplicate a string
 char* my_strdup(const char *src) {
-  if (src == NULL) {
-    return NULL;
-  }
-  // Allocate memory for the new string
-  char *dest = malloc(strlen(src) + 1);
-  if (dest == NULL) {
-    perror("fail to allocate memory in {my_strdup}.\n");
-    exit(EXIT_FAILURE);
-  }
-
-  // Copy the contents of the source string to the destination string
-  strcpy(dest, src);
+  if (src == NULL) return NULL;
+  const unsigned long len = strlen(src) + 1;
+  char *dest = malloc(len);
+  assert(dest != NULL);
+  memcpy(dest, src, sizeof(char) * len);
   return dest;
 }
 
 // simple utility function
 void reverseArray(int arr[], const int size) {
-  int start = 0;
-  int end = size - 1;
+  int start = 0, end = size - 1;
   while (start < end) {
     const int temp = arr[start];
     arr[start] = arr[end];
@@ -78,7 +70,7 @@ const char* int2String(const int n) {
  */
 const char* float2String(const float f) {
   char *s;
-  asprintf(&s, "%f",f);
+  asprintf(&s, "%f", f);
   return s;
 }
 
@@ -93,4 +85,9 @@ bool in(const int target, const int num, ...) {
   }
   va_end(args);
   return false;
+}
+
+// helper function for deleteLabel
+int cmp_int(const void *a, const void *b) {
+  return *(int *) a - *(int *) b;
 }

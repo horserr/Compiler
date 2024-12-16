@@ -63,7 +63,7 @@ static void printOp(FILE *f, const Operand *op) {
   }
 }
 
-static void printCode(FILE *f, const Code *c) {
+void printCode(FILE *f, const Code *c) {
   assert(c != NULL);
   enum binary_op { ADD, SUB, MUL, DIV };
   static const char b[] = {
