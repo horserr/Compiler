@@ -8,16 +8,28 @@
 #include "utils.h"
 #endif
 
+typedef struct use_info {
+  const Operand *op;
+  bool in_use;
+} use_info;
+
+typedef struct {
+  const Chunk *currentLine;
+  use_info use[3]; // no more than 3 operands in an expression
+} info;
+
 typedef struct {
   const Chunk *begin, *end;
+  int len;    // the number of code inside begin and end
+  info *info; // an array
 } BasicBlock;
 
 typedef struct {
-  int cnt, capacity;
+  int cnt;
   BasicBlock *container;
 } Block;
 
 void optimize(const Chunk *sentinel);
-void free_block(Block *block);
+void freeBlock(Block *block);
 
 #endif

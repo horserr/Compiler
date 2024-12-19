@@ -4,6 +4,38 @@
 #include "IR.h"
 #endif
 
+// a list contains the number of operands for each kind of code
+const u_int8_t operand_count_per_code[] = {
+  [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
+  [C_LABEL] = 1, [C_RETURN] = 1, [C_GOTO] = 1, [C_ARG] = 1,
+  [C_ASSIGN] = 2,
+  [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3, [C_IFGOTO] = 3,
+  [C_DEC] = 1,
+};
+
+int cmp_operand(const void *o1, const void *o2) {
+#define allow_num_types \
+    2,\
+    O_TEM_VAR, O_VARIABLE
+  //the order of different operands
+  const u_int8_t order[] = {
+    [O_TEM_VAR] = 0, [O_VARIABLE] = 1,
+  };
+
+  const Operand *op1 = (Operand *) o1, *op2 = (Operand *) o2;
+  // no constant
+  assert(op1 != NULL && in(op1->kind, allow_num_types));
+  assert(op2 != NULL && in(op2->kind, allow_num_types));
+#undef allow_num_types
+  const int kind1 = op1->kind, kind2 = op2->kind;
+
+  if (kind1 != kind2) return order[kind1] - order[kind2];
+  // todo also modify here
+  if (kind1 == O_TEM_VAR) return op1->var_no - op2->var_no;
+  if (kind1 == O_VARIABLE) return strcmp(op1->value_s, op2->value_s);
+  assert(false);
+}
+
 void initChunk(Chunk **sentinel) {
   assert(*sentinel == NULL); // sentinel should be NULL at first
   *sentinel = malloc(sizeof(Chunk));
@@ -165,19 +197,9 @@ void cleanOp(const Operand *op) {
 }
 
 static void cleanCode(const Code *code) {
-  // a list contains the number of operands for each kind of code
-  static const int a[] = {
-    [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
-    [C_LABEL] = 1, [C_RETURN] = 1, [C_GOTO] = 1, [C_ARG] = 1,
-    [C_ASSIGN] = 2,
-    [C_ADD] = 3, [C_MUL] = 3, [C_SUB] = 3, [C_DIV] = 3, [C_IFGOTO] = 3,
-    [C_DEC] = 1,
-  };
+  for (int i = 0; i < operand_count_per_code[code->kind]; ++i)
+    cleanOp((Operand *) &code->as + i);
 
-  const Operand *op = (Operand *) &code->as;
-  for (int i = 0; i < a[code->kind]; ++i) {
-    cleanOp(op + i);
-  }
   if (code->kind == C_IFGOTO)
     free(code->as.ternary.relation);
 }

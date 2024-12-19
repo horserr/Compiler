@@ -642,7 +642,7 @@ static void resolveVarDec(const ParseTNode *node, DecGather **gather) {
   const ParseTNode *IDNode = getChildByName(node, "ID");
   const char *name = IDNode->value.str_value;
   // change the sequence of size in size_list
-  reverseArray(size_list, dimension);
+  reverseArray(size_list, dimension, sizeof(int));
   gatherDecInfo(gather, name, dimension, size_list, IDNode->lineNum);
 }
 

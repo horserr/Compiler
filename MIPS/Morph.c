@@ -135,7 +135,7 @@ static void printADD(const Code *code) {
     return printTernary("add", getReg(result),
                         getReg(op1), getReg(op2));
 
-  if (op1->kind == O_CONSTANT) swap(op1, op2);
+  if (op1->kind == O_CONSTANT) SWAP(&op1, &op2, sizeof(Operand));
 
   char *immediate = (char *) int2String(op2->value);
   printTernary("addi", getReg(result), getReg(op1), immediate);

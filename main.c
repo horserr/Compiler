@@ -75,6 +75,7 @@ int main(const int argc, char **argv) {
 
   printMIPS(argv[2], chunk);
 
+  // todo change free chunk to static function
   freeChunk(chunk);
   freeTable((SymbolTable *) table);
   cleanParseTree();

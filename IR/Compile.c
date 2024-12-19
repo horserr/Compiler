@@ -183,7 +183,7 @@ static Operand evalArithmatic(const ParseTNode *node) {
   CODE_BINARY_CASE(SUB);
   CODE_BINARY_CASE(MUL);
   CODE_BINARY_CASE(DIV);
-  exit(EXIT_FAILURE);
+  assert(false);
 #undef CODE_BINARY_CASE
 }
 
