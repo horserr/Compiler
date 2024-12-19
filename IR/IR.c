@@ -65,7 +65,7 @@ Operand copyOperand(const Operand *src) {
   return tmp;
 }
 
-static void printOp(FILE *f, const Operand *op) {
+void printOp(FILE *f, const Operand *op) {
   switch (op->kind) {
     case O_VARIABLE:
       fprintf(f, "%s ", op->value_s);

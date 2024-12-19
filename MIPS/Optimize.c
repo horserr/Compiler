@@ -17,6 +17,7 @@ extern const u_int8_t operand_count_per_code[];
 int cmp_use_info(const void *u1, const void *u2);
 // print code is only for debug purpose, so declare it as
 // `extern` rather than add it in header file.
+extern void printOp(FILE *f, const Operand *op);
 extern void printCode(FILE *f, const Code *c);
 
 ///// Conditions and Labels ////////////////////////////////
@@ -245,10 +246,10 @@ static void setInfo(BasicBlock *basic) {
   while (chunk != basic->begin->prev) {
     if (!in(chunk->code.kind, EFFECTIVE_CODE)) goto CONTINUE;
     if (*len >= capacity) goto RESIZE;
-    // update the use-info table with the current code
-    updateUseInfoTable(&chunk->code, table);
     // get a snapshot of the current state of use-info table
     setUseInfo(&(*info_)[(*len)++], chunk, table);
+    // update the use-info table with the current code
+    updateUseInfoTable(&chunk->code, table);
   CONTINUE:
     chunk = chunk->prev;
     continue;
@@ -361,6 +362,32 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
   return flag;
 }
 
+static void printUseInfo(info *info_) {
+}
+
+static void printBasicBlock(const BasicBlock *basic) {
+  for (int i = 0; i < basic->len; ++i) {
+    const info *info_ = basic->info + i;
+    const Chunk *chunk = info_->currentLine;
+    // all code are effective if they are inside 'info' array
+    assert(in(chunk->code.kind, EFFECTIVE_CODE));
+    printf("As for line %d: \t", i);
+    printCode(stdout, &chunk->code);
+    printf("use info is: \t");
+    const Code *code = &chunk->code;
+    const int kind = code->kind;
+
+    for (int e = 0; e < operand_count_per_code[kind]; ++e) {
+      const Operand *op = (Operand *) &code->as + e;
+      // jump over non-effective operand, but always increment index
+      if (!in(op->kind, EFFECTIVE_OP)) continue;
+      printOp(stdout, info_->use[e].op);
+      printf("--> in use or not: (%d)  ", info_->use[e].in_use);
+    }
+    printf("\n");
+  }
+}
+
 // debug utility
 __attribute__((unused))
 static void printBlock(const Block *block) {
@@ -372,25 +399,17 @@ static void printBlock(const Block *block) {
   }
   // print the first block info list
   printf("\n+++ FIRST basic block:\n");
-  const BasicBlock *basic = block->container;
-  for (int i = 0; i < basic->len; ++i) {
-    const Chunk *chunk = basic->info[i].currentLine;
-    if (!in(chunk->code.kind, EFFECTIVE_CODE))
-      printf("\n");
-    else
-      printCode(stdout, &chunk->code);
-  }
+  printBasicBlock(block->container);
 }
 
-void optimize(const Chunk *sentinel) {
+Block* optimize(const Chunk *sentinel) {
   while (optimizeArithmatic(sentinel)) { /* do nothing */ }
   flipCondition(sentinel);
   deleteLabels(sentinel);
   Block *block = partitionChunk(sentinel);
 
   printBlock(block);
-  // todo remove
-  freeBlock(block);
+  return block;
 }
 
 ///// utilities functions //////////////////////////////////
