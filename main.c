@@ -22,12 +22,10 @@ extern int yydebug;
 extern int yylineno;
 extern void yyrestart(FILE *input_file);
 extern int yyparse();
+extern void printParseTRoot();
+extern void printChunk(const char *file_name, const Chunk *sentinel);
 
 void rewind(FILE *f) {
-  if (!f) {
-    DEBUG_INFO("File can't open.\n");
-    return;
-  }
   yylineno = 1;
   yyrestart(f);
 }
@@ -42,7 +40,7 @@ int parse() {
 int main(const int argc, char **argv) {
   if (argc != 3) {
     DEBUG_INFO("Arguments should be input test file and **output** file.\n");
-    return 0;
+    return 1;
   }
   FILE *f = fopen(argv[1], "r");
   if (!f) {
@@ -57,8 +55,8 @@ int main(const int argc, char **argv) {
 #ifdef LOCAL
   // Redirect stdout to the output file
   if (freopen("test/out/out.txt", "w", stdout) == NULL) {
-    DEBUG_INFO("Something wrong while redirecting stdout.\n");
-    exit(EXIT_FAILURE);
+    perror("Something wrong while redirecting stdout.\n");
+    return 1;
   }
   printParseTRoot();
   // redirect stdout to terminal
@@ -67,15 +65,15 @@ int main(const int argc, char **argv) {
 
   const SymbolTable *table = buildTable(root);
   const Chunk *chunk = compile(root, table);
-  optimize(chunk);
+  Block *block = optimize(chunk);
 
 #ifdef LOCAL
   printChunk("test/out/out.ir", chunk);
 #endif
 
-  printMIPS(argv[2], chunk);
+  printMIPS(argv[2], block);
 
-  // todo change free chunk to static function
+  freeBlock(block);
   freeChunk(chunk);
   freeTable((SymbolTable *) table);
   cleanParseTree();

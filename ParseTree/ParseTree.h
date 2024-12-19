@@ -49,7 +49,6 @@ ParseTNode* createParseTNodeWithValue(const char *name, int lineNum, ValueUnion 
 void addChild(ParseTNode *parent, ParseTNode *child);
 void freeParseTNode(ParseTNode *node);
 void printParseTree(const ParseTNode *root);
-void printParseTRoot();
 void cleanParseTree();
 
 // utility function

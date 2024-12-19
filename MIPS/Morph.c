@@ -135,7 +135,8 @@ static void printADD(const Code *code) {
     return printTernary("add", getReg(result),
                         getReg(op1), getReg(op2));
 
-  if (op1->kind == O_CONSTANT) SWAP(&op1, &op2, sizeof(Operand));
+  if (op1->kind == O_CONSTANT)
+    SWAP(&op1, &op2, sizeof(Operand));
 
   char *immediate = (char *) int2String(op2->value);
   printTernary("addi", getReg(result), getReg(op1), immediate);
@@ -170,7 +171,7 @@ static void printMUL(const Code *code) {
   printTernary("mul", result_reg, op1_reg, op2_reg);
 }
 
-static void printIR(const Code *code) {
+static void print(const Code *code) {
 #define elem(T) [C_##T] = print##T
   const FuncPtr printTable[] = {
     elem(ASSIGN), elem(ADD), elem(SUB), elem(MUL), elem(DIV),
@@ -226,17 +227,20 @@ static void initialize() {
 #undef binary
 }
 
-void printMIPS(const char *file_name, const Chunk *sentinel) {
+void printMIPS(const char *file_name, const Block *blocks) {
   f = fopen(file_name, "w");
   if (f == NULL) {
     DEBUG_INFO("Can't open file %s.\n", file_name);
     exit(EXIT_FAILURE);
   }
   // initialize();
-  const Chunk *c = sentinel->next;
-  while (c != sentinel) {
-    printIR(&c->code);
-    c = c->next;
+  for (int i = 0; i < blocks->cnt; ++i) {
+    const BasicBlock *basic = blocks->container + i;
+    const Chunk *chunk = basic->begin;
+    while (chunk != basic->end->next) {
+      print(&chunk->code);
+      chunk = chunk->next;
+    }
   }
   fclose(f);
 }

@@ -29,7 +29,7 @@ typedef struct {
   BasicBlock *container;
 } Block;
 
-void optimize(const Chunk *sentinel);
+Block* optimize(const Chunk *sentinel);
 void freeBlock(Block *block);
 
 #endif

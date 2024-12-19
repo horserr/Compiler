@@ -375,22 +375,20 @@ static void printBlock(const Block *block) {
   const BasicBlock *basic = block->container;
   for (int i = 0; i < basic->len; ++i) {
     const Chunk *chunk = basic->info[i].currentLine;
-    if (!in(chunk->code.kind, EFFECTIVE_CODE))
-      printf("\n");
-    else
-      printCode(stdout, &chunk->code);
+    // all code are effective if they are inside 'info' array
+    assert(in(chunk->code.kind, EFFECTIVE_CODE));
+    printCode(stdout, &chunk->code);
   }
 }
 
-void optimize(const Chunk *sentinel) {
+Block* optimize(const Chunk *sentinel) {
   while (optimizeArithmatic(sentinel)) { /* do nothing */ }
   flipCondition(sentinel);
   deleteLabels(sentinel);
   Block *block = partitionChunk(sentinel);
 
   printBlock(block);
-  // todo remove
-  freeBlock(block);
+  return block;
 }
 
 ///// utilities functions //////////////////////////////////
