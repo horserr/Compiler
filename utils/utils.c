@@ -16,18 +16,6 @@ char* my_strdup(const char *src) {
   return dest;
 }
 
-// simple utility function
-void reverseArray(int arr[], const int size) {
-  int start = 0, end = size - 1;
-  while (start < end) {
-    const int temp = arr[start];
-    arr[start] = arr[end];
-    arr[end] = temp;
-    start++;
-    end--;
-  }
-}
-
 /**
  * @return a copy of string
 */
@@ -87,7 +75,53 @@ bool in(const int target, const int num, ...) {
   return false;
 }
 
-// helper function for deleteLabel
-int cmp_int(const void *a, const void *b) {
-  return *(int *) a - *(int *) b;
+int cmp_int(const void *a, const void *b) { return *(int *) a - *(int *) b; }
+
+// notice this function!
+int cmp_str(const void *a, const void *b) { return strcmp(*(char **) a, *(char **) b); }
+
+/**
+ * reverse an array.
+ * @param base the name of array to be reversed
+ * @param len the number of members in array, mostly equals to array length
+ * @param size the type size of each element
+ */
+void reverseArray(void *base, const size_t len, const size_t size) {
+  char *start = base, *end = start + (len - 1) * size;
+  while (start < end) {
+    SWAP(start, end, size);
+    start += size;
+    end -= size;
+  }
+}
+
+/**
+ * @brief remove duplicate elements within the "ordered" array, and may update the @param len
+ * @note the given array must be ordered
+ * @param base the name of array to be modified
+ * @param len pointer to the number of members in array, mostly equals to array length
+ * @param size the type size of each element
+ * @param cmp the compare function
+ */
+void removeDuplicates(void *base, size_t *len, const size_t size,
+                      const __compar_fn_t cmp) {
+  char *base_ = base;
+  for (int i = 1; i < *len; ++i) {
+    const void *p = (char *) base + i * size;
+    if (cmp(base_, p) != 0) {
+      base_ += size;
+      memcpy(base_, p, size);
+    }
+  }
+  *len = INDEX(base, base_, size) + 1;
+}
+
+// find in sequential order in an array. Alas, the better approach is to use native `bsearch`
+void* findInArray(const void *key, const void *base, const size_t len,
+                  const size_t size, const __compar_fn_t cmp) {
+  for (int i = 0; i < len; ++i) {
+    void *tmp = (char *) base + i * size;
+    if (cmp(key, tmp) == 0) return tmp;
+  }
+  return NULL;
 }
