@@ -20,8 +20,6 @@ int cmp_use_info(const void *u1, const void *u2);
 extern void printOp(FILE *f, const Operand *op);
 extern void printCode(FILE *f, const Code *c);
 
-///// Conditions and Labels ////////////////////////////////
-
 /**
  * IF a == b GOTO label1  |  IF a != b GOTO label2
  * GOTO label2            |  LABEL label1
@@ -92,8 +90,6 @@ static void deleteLabels(const Chunk *sentinel) {
   }
   free(container);
 }
-
-///// Arithmatic ///////////////////////////////////////////
 
 // change (op - #constant) into (op + #-constant)
 static void organizeOpSequence(Code *c) {
@@ -317,14 +313,31 @@ static Block* partitionChunk(const Chunk *sentinel) {
  * <b>"temporary"</b> constants
  * @return true if there are some constants that can be folded
  *
- * <p>
- *  t0 := #2      |  t1 := 6
+ *  @example:
+ *  <pre>
+ *  t0 := #2      |  t1 := #6
  *  t1 := t0 * 3  |
+ *  </pre>
+ *
+ *  @example:
+ *  <pre>
+ *  a := 0        |  a := #0
+ *  t0 := a * b   |  t0 := #0
+ *  </pre>
+ *
+ *  @example:
+ *  <pre>
+ *  a := 1        |  a := #0
+ *  t0 := a * b   |  t0 := b
+ *  </pre>
+ *
+ *  @todo: can use more advanced methods, such as look ahead one line
  */
 static bool optimizeArithmatic(const Chunk *sentinel) {
   bool flag = false;
   Chunk *chunk = sentinel->next;
   while (chunk != sentinel) {
+    bool need_remove = true;
     Code *c = &chunk->code;
     chunk = chunk->next; // chunk is now pointing to next code
     foldConstant(c);
@@ -334,6 +347,7 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
     const Operand *prev_right = &c->as.assign.right;
     if (prev_right->kind != O_CONSTANT) continue;
     const Operand *prev_left = &c->as.assign.left;
+    // the previous line of code is assignment of constant
 
     Operand *target = NULL;
     // check assignment
@@ -343,26 +357,47 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
         target = right;
         goto FOUND;
       }
+      if (right->kind == O_VARIABLE && strcmp(right->value_s, prev_left->value_s) == 0) {
+        need_remove = false;
+        target = right;
+        goto FOUND;
+      }
     }
     // check binary operation
     if (!in(chunk->code.kind, 4, C_ADD, C_SUB, C_MUL, C_DIV)) continue;
     Operand *op1 = &chunk->code.as.binary.op1;
     Operand *op2 = &chunk->code.as.binary.op2;
 
-    if (!in(O_TEM_VAR, 2, op1->kind, op2->kind)) continue;
-    if (!in(prev_left->var_no, 2, op1->var_no, op2->var_no)) continue;
+    if (in(O_TEM_VAR, 2, op1->kind, op2->kind)) {
+      if (in(prev_left->var_no, 2, op1->var_no, op2->var_no)) {
+        target = op1->var_no == prev_left->var_no ? op1 : op2;
+        goto FOUND;
+      }
+    } else if (in(O_VARIABLE, 2, op1->kind, op2->kind)) {
+      need_remove = false;
+      if (op1->kind == O_VARIABLE &&
+          strcmp(op1->value_s, prev_left->value_s) == 0) {
+        target = op1;
+        goto FOUND;
+      }
+      if (op2->kind == O_VARIABLE &&
+          strcmp(op2->value_s, prev_left->value_s) == 0) {
+        target = op2;
+        goto FOUND;
+      }
+    }
+    continue;
 
-    target = op1->var_no == prev_left->var_no ? op1 : op2;
-  FOUND: //label
+  FOUND:
+    if (target->kind == O_VARIABLE)
+      free((void *) target->value_s);
     target->value = prev_right->value;
     target->kind = O_CONSTANT;
-    removeCode(chunk->prev);
     flag = true;
+    if (need_remove)
+      removeCode(chunk->prev);
   }
   return flag;
-}
-
-static void printUseInfo(info *info_) {
 }
 
 static void printBasicBlock(const BasicBlock *basic) {
@@ -412,7 +447,6 @@ Block* optimize(const Chunk *sentinel) {
   return block;
 }
 
-///// utilities functions //////////////////////////////////
 void freeBlock(Block *block) {
   assert(block != NULL);
   for (int i = 0; i < block->cnt; ++i) {

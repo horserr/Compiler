@@ -14,7 +14,8 @@ static void printBinary(const char *name, RegType reg1, RegType reg2);
 static void printTernary(const char *name, RegType result,
                          RegType reg1, RegType reg2);
 
-FILE *f = NULL;
+static FILE *f = NULL;
+static use_info *USE_INFO = NULL;
 
 static void printLoadImm(const RegType reg, const int val) {
   char *im = (char *) int2String(val);
@@ -230,13 +231,14 @@ static void initialize() {
 void printMIPS(const char *file_name, const Block *blocks) {
   f = fopen(file_name, "w");
   if (f == NULL) {
-    DEBUG_INFO("Can't open file %s.\n", file_name);
+    DEBUG_INFO("%s %s.\n", strerror(errno), file_name);
     exit(EXIT_FAILURE);
   }
   // initialize();
   for (int i = 0; i < blocks->cnt; ++i) {
     const BasicBlock *basic = blocks->container + i;
     const Chunk *chunk = basic->begin;
+    // todo move use_info pointer
     while (chunk != basic->end->next) {
       print(&chunk->code);
       chunk = chunk->next;
