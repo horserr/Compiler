@@ -9,7 +9,7 @@
 #endif
 
 // remainder: only use these macros inside 'in' function
-#define EFFECTIVE_CODE 5, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV
+#define EFFECTIVE_CODE 6, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, C_RETURN
 #define EFFECTIVE_OP   2, O_VARIABLE, O_TEM_VAR
 
 typedef struct use_info {

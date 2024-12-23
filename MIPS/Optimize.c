@@ -11,15 +11,17 @@ typedef struct {
 
 extern const u_int8_t operand_count_per_code[];
 int cmp_use_info(const void *u1, const void *u2);
-// print code is only for debug purpose, so declare it as
-// `extern` rather than add it in header file.
+/* print code is only for debug purpose, so declare it as
+ `extern` rather than add it in the header file. */
 extern void printOp(FILE *f, const Operand *op);
 extern void printCode(FILE *f, const Code *c);
 
 /**
+ * <pre>
  * IF a == b GOTO label1  |  IF a != b GOTO label2
  * GOTO label2            |  LABEL label1
  * LABEL label1           |
+ * </pre>
  */
 static void flipCondition(const Chunk *sentinel) {
   Chunk *chunk = (Chunk *) sentinel;
@@ -132,7 +134,7 @@ static UseInfoTable* createUseInfoTable(const BasicBlock *basic) {
   *len = 0;
   *use = malloc(sizeof(use_info) * capacity);
 
-  // loop from begin to end
+  // loop from begging to end
   const Chunk *chunk = basic->begin;
   while (chunk != basic->end->next) {
     const Code *code = &chunk->code;
@@ -187,13 +189,21 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
 
   // result operand is always the first operand lower in memory
   const Operand *result = (Operand *) &code->as;
+  // todo refine this
+  if (kind == C_RETURN && result->kind == O_CONSTANT) return;
   assert(in(result->kind, EFFECTIVE_OP));
+  /* Note: if kind is C_RETURN, then the in_use attribute should be updated
+  to be true. Therefore, ignore it and continue to for loop.*/
+  if (kind == C_RETURN) {
+    update(result, true, table, cmp_use_info);
+    return;
+  }
   update(result, false, table, cmp_use_info);
 
   // iterate through those operands that are on the right side of equal sign
   for (int i = 1; i < operand_count_per_code[kind]; ++i) {
     const Operand *op = result + i;
-    // do not update variables whose kind aren't within effective operands
+    // do not update variables whose kind isn't within effective operands
     if (!in(op->kind, EFFECTIVE_OP)) continue;
     update(op, true, table, cmp_use_info);
   }
@@ -222,7 +232,7 @@ static void setUseInfo(info *info, const Chunk *chunk, const UseInfoTable *table
 
 #undef search
 
-// set info for each line of code inside basic block
+// set info for each line of code inside the basic block
 static void setInfo(BasicBlock *basic) {
   int capacity = 5, *len = &basic->len;
   info **info_ = &basic->info;
@@ -251,7 +261,7 @@ static void setInfo(BasicBlock *basic) {
   freeUseInfoTable(table);
 }
 
-// for each basic blocks of block, set their info array
+// for each basic block, set their info array
 static void setBlocksInfo(const Block *block) {
   assert(block != NULL);
   // loop through all basic blocks
@@ -279,12 +289,15 @@ static Block* partitionChunk(const Chunk *sentinel) {
   while (chunk != sentinel) {
     const Code *c = &chunk->code;
     // fixme include function call and other types as well
-    if (!in(c->kind, 3, C_LABEL, C_IFGOTO, C_GOTO))
+    if (!in(c->kind, 4, C_LABEL, C_IFGOTO, C_GOTO, C_FUNCTION))
       goto CONTINUE;
     if (*cnt >= capacity) goto RESIZE;
 
-    const Chunk *target = c->kind == C_LABEL ? chunk : chunk->next;
-    // check for duplication before add
+    // todo refine this
+    const Chunk *target = in(c->kind, 2, C_FUNCTION, C_LABEL)
+                            ? chunk
+                            : chunk->next;
+    // check for duplication before adding
     if ((*container)[*cnt - 1].begin != target)
       (*container)[(*cnt)++].begin = target;
   CONTINUE:
@@ -398,7 +411,7 @@ static void printBasicBlock(const BasicBlock *basic) {
   for (int i = 0; i < basic->len; ++i) {
     const info *info_ = basic->info + i;
     const Chunk *chunk = info_->currentLine;
-    // all code are effective if they are inside 'info' array
+    // all code is effective if they are inside 'info' array
     assert(in(chunk->code.kind, EFFECTIVE_CODE));
     printf("As for line %d: \t", i);
     printCode(stdout, &chunk->code);
@@ -409,9 +422,12 @@ static void printBasicBlock(const BasicBlock *basic) {
     for (int e = 0; e < operand_count_per_code[kind]; ++e) {
       const Operand *op = (Operand *) &code->as + e;
       // jump over non-effective operand, but always increment index
-      if (!in(op->kind, EFFECTIVE_OP)) continue;
+      if (!in(op->kind, EFFECTIVE_OP)) {
+        printf("i:[%d] Oops\t", e);
+        continue;
+      }
       printOp(stdout, info_->use[e].op);
-      printf("--> in use or not: (%d)  ", info_->use[e].in_use);
+      printf("\b[%d]--> in use or not: (%d)  ", e, info_->use[e].in_use);
     }
     printf("\n");
   }

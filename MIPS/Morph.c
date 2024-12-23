@@ -5,7 +5,6 @@
 #include "IR"
 #include "Morph.h"
 #endif
-#include <complex.h>
 
 typedef void (*FuncPtr)(const Code *);
 typedef const char *RegType;
@@ -79,7 +78,7 @@ static void printSaveOrLoad(const char *T, const RegType reg,
 // always return the index of available register
 static int findAvailReg() {
   if (deque.size == LEN) { // spill register
-    // todo
+    // fixme
     assert(false);
   }
   const int index = findInArray(&EMPTY_PAIR, deque.pairs,
@@ -133,7 +132,7 @@ static RegType ensureReg(const Operand *op) {
     return regsPool[index];
   // not find
   const RegType result_reg = allocateReg(op);
-  // todo
+  // fixme
   printSaveOrLoad("lw", result_reg, 0, "hh");
   return result_reg;
 }
@@ -142,6 +141,12 @@ static void freeReg(const Operand *op) {
   const int index = findInPairs(op);
   assert(index != -1);
   markRegEmpty(index);
+}
+
+static void flushReg() {
+  // fixme save all values
+  pairs_sentinel.next_i = pairs_sentinel.prev_i = -1;
+  memset(deque.pairs, 0, sizeof(pair) * LEN);
 }
 #undef pairs_sentinel
 #undef EMPTY_PAIR
@@ -170,7 +175,7 @@ static void printRETURN(const Code *code) {
     printLoadImm("$v0", op->value);
   } else {
     const RegType reg = ensureReg(op);
-    CHECK_FREE(0, op); // fixme here is a problem
+    CHECK_FREE(0, op);
     printBinary("move", "$v0", reg);
   }
   printUnary("jr", "$ra");
@@ -274,18 +279,19 @@ static void printArithmatic(const Code *code) {
     printLoadImm(op1_reg, op1->value);
   } else {
     op1_reg = ensureReg(op1);
-    CHECK_FREE(1, op1);
   }
-
   if (op2->kind == O_CONSTANT) {
     index2 = findAvailReg();
     op2_reg = regsPool[index2];
     printLoadImm(op2_reg, op2->value);
   } else {
     op2_reg = ensureReg(op2);
-    CHECK_FREE(2, op2);
   }
 
+  if (op1->kind != O_CONSTANT)
+    CHECK_FREE(1, op1);
+  if (op2->kind != O_CONSTANT)
+    CHECK_FREE(2, op2);
   const RegType result_reg = allocateReg(&code->as.binary.result);
   if (kind == C_DIV) {
     printBinary("div", op1_reg, op2_reg);
@@ -385,6 +391,7 @@ void printMIPS(const char *file_name, const Block *blocks) {
       print(code);
       chunk = chunk->next;
     }
+    flushReg();
   }
   fclose(f);
 }
