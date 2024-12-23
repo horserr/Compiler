@@ -4,10 +4,6 @@
 #include "Optimize.h"
 #endif
 
-// remainder: only use these macros inside 'in' function
-#define EFFECTIVE_CODE 5, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV
-#define EFFECTIVE_OP   2, O_VARIABLE, O_TEM_VAR
-
 typedef struct {
   size_t len;
   use_info *use;
@@ -41,10 +37,8 @@ static void flipCondition(const Chunk *sentinel) {
     const char *flipList[len] = {"==", "<", ">", "<=", ">=", "!="};
     char **relation = &c->as.ternary.relation;
     // search in flipList
-    char **find = findInArray(relation, flipList,
-                              len, sizeof(char *), cmp_str);
-    assert(find != NULL);
-    const int index = INDEX(flipList, find, sizeof(char *));
+    const int index = findInArray(relation, flipList,
+                                  len, sizeof(char *), cmp_str);
     free(*relation); // maybe cause free after use warning.
     *relation = my_strdup(flipList[len - 1 - index]);
 

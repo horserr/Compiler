@@ -51,7 +51,7 @@ bool in(int target, int num, ...);
 
 void reverseArray(void *base, size_t len, size_t size);
 void removeDuplicates(void *base, size_t *len, size_t size, __compar_fn_t cmp);
-void* findInArray(const void *key, const void *base, size_t len,
-                  size_t size, __compar_fn_t cmp);
+int findInArray(const void *key, const void *base, size_t len,
+                size_t size, __compar_fn_t cmp);
 
 #endif

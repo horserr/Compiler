@@ -116,12 +116,13 @@ void removeDuplicates(void *base, size_t *len, const size_t size,
   *len = INDEX(base, base_, size) + 1;
 }
 
-// find in sequential order in an array. Alas, the better approach is to use native `bsearch`
-void* findInArray(const void *key, const void *base, const size_t len,
-                  const size_t size, const __compar_fn_t cmp) {
+// Find in sequential order in an array. Alas, the better approach is to use native `bsearch`
+__attribute__((warn_unused_result))
+int findInArray(const void *key, const void *base, const size_t len,
+                const size_t size, const __compar_fn_t cmp) {
   for (int i = 0; i < len; ++i) {
-    void *tmp = (char *) base + i * size;
-    if (cmp(key, tmp) == 0) return tmp;
+    const void *tmp = (char *) base + i * size;
+    if (cmp(key, tmp) == 0) return i;
   }
-  return NULL;
+  return -1;
 }

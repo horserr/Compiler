@@ -3,6 +3,7 @@
 #else
 #include "IR.h"
 #endif
+#include "../MIPS/Optimize.h"
 
 // a list contains the number of operands for each kind of code
 const u_int8_t operand_count_per_code[] = {
@@ -14,9 +15,6 @@ const u_int8_t operand_count_per_code[] = {
 };
 
 int cmp_operand(const void *o1, const void *o2) {
-#define allow_num_types \
-    2,\
-    O_TEM_VAR, O_VARIABLE
   //the order of different operands
   const u_int8_t order[] = {
     [O_TEM_VAR] = 0, [O_VARIABLE] = 1,
@@ -24,9 +22,8 @@ int cmp_operand(const void *o1, const void *o2) {
 
   const Operand *op1 = (Operand *) o1, *op2 = (Operand *) o2;
   // no constant
-  assert(op1 != NULL && in(op1->kind, allow_num_types));
-  assert(op2 != NULL && in(op2->kind, allow_num_types));
-#undef allow_num_types
+  assert(op1 != NULL && in(op1->kind, EFFECTIVE_OP));
+  assert(op2 != NULL && in(op2->kind, EFFECTIVE_OP));
   const int kind1 = op1->kind, kind2 = op2->kind;
 
   if (kind1 != kind2) return order[kind1] - order[kind2];
