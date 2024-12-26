@@ -10,10 +10,10 @@
 
 // remainder: only use these macros inside 'in' function
 // todo change this into an array and non-effective
-#define EFFECTIVE_CODE 7, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, C_RETURN, C_DEC
+#define EFFECTIVE_CODE 8, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, C_RETURN, C_DEC, C_IFGOTO
 #define EFFECTIVE_OP   4, O_VARIABLE, O_TEM_VAR, O_DEREF, O_REFER
 
-typedef struct use_info {
+typedef struct {
   const Operand *op;
   bool in_use;
 } use_info;

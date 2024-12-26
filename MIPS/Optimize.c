@@ -142,8 +142,12 @@ static UseInfoTable* createUseInfoTable(const BasicBlock *basic) {
     const int kind = code->kind;
     if (!in(kind, EFFECTIVE_CODE)) continue;
 
+    u_int8_t op_cnt = operand_count_per_code[kind];
+    // the third operand for `C_IFGOTO` is label
+    if (kind == C_IFGOTO) op_cnt--;
+
     // iterate through all operands per code
-    for (int i = 0; i < operand_count_per_code[kind]; ++i) {
+    for (int i = 0; i < op_cnt; ++i) {
       const Operand *op = (Operand *) &code->as + i;
       // ignore constant
       if (!in(op->kind, EFFECTIVE_OP)) continue;
@@ -173,6 +177,9 @@ static void freeUseInfoTable(UseInfoTable *table) {
 #define search(key, table, cmp_fn) \
     bsearch(&(key), (table)->use, (table)->len, sizeof(use_info), (cmp_fn))
 
+#define check_distill_op(op) \
+  either((op)->kind, O_REFER, O_DEREF) ? (op)->address : (op)
+
 /**
  * @brief update use-info table with <b>'effective'</b> variables of the given current code
  * <p>
@@ -192,27 +199,28 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
   // result operand is always the first operand lower in memory
   const Operand *result = (Operand *) &code->as;
   // todo refine this
-  // ignore it if return a constant
   if (kind == C_RETURN && result->kind == O_CONSTANT) return;
   assert(in(result->kind, EFFECTIVE_OP));
   // Note: if kind is C_RETURN, then the in_use attribute should be updated to be true.
   if (kind == C_RETURN) {
+    assert(either(result->kind, O_TEM_VAR, O_VARIABLE));
     update(result, true, table, cmp_use_info);
     return;
   }
 
-  int start_index = 0; // set the start index for the below `for` loop
-  if (!either(result->kind, O_REFER, O_DEREF)) {
-    // normal case
-    // if kind includes C_DEC, then use info set to false
+  int start_index = 0;
+  if (!either(result->kind, O_REFER, O_DEREF)) { // normal case
+    // if kind includes `C_DEC`, then use info set to false
     update(result, false, table, cmp_use_info);
     start_index = 1;
   }
+  u_int8_t op_cnt = operand_count_per_code[kind];
+  if (kind == C_IFGOTO) {
+    start_index = 0;
+    op_cnt--;
+  }
 
-#define check_distill_op(op) \
-  either((op)->kind, O_REFER, O_DEREF) ? (op)->address : (op)
-
-  for (int i = start_index; i < operand_count_per_code[kind]; ++i) {
+  for (int i = start_index; i < op_cnt; ++i) {
     const Operand *op = result + i;
     // do not update variables whose kind isn't within effective operands
     if (!in(op->kind, EFFECTIVE_OP)) continue;
@@ -230,7 +238,11 @@ static void copyUseInfo(info *info, const Chunk *chunk, const UseInfoTable *tabl
   const int kind = chunk->code.kind;
   assert(in(kind, EFFECTIVE_CODE));
 
-  for (int i = 0; i < operand_count_per_code[kind]; ++i) {
+  u_int8_t op_cnt = operand_count_per_code[kind];
+  // the third operand for `C_IFGOTO` is label
+  if (kind == C_IFGOTO) op_cnt--;
+
+  for (int i = 0; i < op_cnt; ++i) {
     const Operand *op = (Operand *) &chunk->code.as + i;
     // only search effective operands
     if (!in(op->kind, EFFECTIVE_OP)) continue;

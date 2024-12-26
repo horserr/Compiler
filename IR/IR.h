@@ -48,8 +48,8 @@ typedef struct {
 
     struct {
       Operand x;
-      Operand label;
       Operand y;
+      Operand label;
       char *relation;
     } ternary;
 

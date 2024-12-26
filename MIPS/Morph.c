@@ -181,33 +181,50 @@ static void printRETURN(const Code *code) {
   printUnary("jr", "$ra");
 }
 
-// static void printIFGOTO(const Code *code) {
-//   assert(code->kind == C_IFGOTO);
-// #define elem(s, m) { #s, #m }
-//   const struct {
-//     const char *symbol;
-//     const char *mnemonic;
-//   } map[] = {
-//         elem(==, beq), elem(!=, bne), elem(>, bgt),
-//         elem(<, blt), elem(>=, bge), elem(<=, ble),
-//       };
-// #undef elem
-//   // todo bsearch
-//   // search in map
-//   const char *name = NULL;
-//   for (int i = 0; i < ARRAY_LEN(map); ++i) {
-//     if (strcmp(map[i].symbol, code->as.ternary.relation) == 0) {
-//       name = map[i].mnemonic;
-//       break;
-//     }
-//   }
-//   assert(name != NULL);
-//   char *label;
-//   asprintf(&label, "label%d", code->as.ternary.label.var_no);
-//   printTernary(name, getReg(&code->as.ternary.x),
-//                getReg(&code->as.ternary.y), label);
-//   free(label);
-// }
+static void printIFGOTO(const Code *code) {
+  assert(code->kind == C_IFGOTO);
+#define elem(s, m) { #s, #m }
+  const struct {
+    const char *symbol;
+    const char *mnemonic;
+  } map[] = {
+        elem(==, beq), elem(!=, bne), elem(>, bgt),
+        elem(<, blt), elem(>=, bge), elem(<=, ble),
+      };
+#undef elem
+  const char *relation = code->as.ternary.relation;
+  const int index = findInArray(&relation, map,
+                                ARRAY_LEN(map), sizeof(map[0]), cmp_str);
+  assert(index != -1);
+  RegType x_reg, y_reg;
+  const Operand *x = &code->as.ternary.x;
+  if (x->kind == O_CONSTANT) {
+    x_reg = int2String(x->value);
+  } else {
+    assert(either(x->kind, O_TEM_VAR, O_VARIABLE));
+    x_reg = ensureReg(x);
+  }
+  const Operand *y = &code->as.ternary.y;
+  if (y->kind == O_CONSTANT) {
+    y_reg = int2String(y->value);
+  } else {
+    assert(either(y->kind, O_TEM_VAR, O_VARIABLE));
+    y_reg = ensureReg(y);
+  }
+  char *label;
+  asprintf(&label, "label%d", code->as.ternary.label.var_no);
+  printTernary(map[index].mnemonic, x_reg, y_reg, label);
+  free(label);
+
+  if (isInteger(x_reg))
+    free((void *) x_reg);
+  else
+    CHECK_FREE(0, x);
+  if (isInteger(y_reg))
+    free((void *) y_reg);
+  else
+    CHECK_FREE(1, y);
+}
 
 static void printDEC(const Code *code) {
   assert(code->kind == C_DEC);
@@ -415,7 +432,7 @@ static void print(const Code *code) {
   const FuncPtr dispatch[] = {
     elem(ASSIGN),
     elem(FUNCTION), elem(GOTO), elem(LABEL), elem(RETURN), elem(DEC),
-    // elem(IFGOTO),
+    elem(IFGOTO),
     [C_ADD] = printArithmatic,
     [C_SUB] = printArithmatic,
     [C_MUL] = printArithmatic,
@@ -423,10 +440,11 @@ static void print(const Code *code) {
   };
   // todo remove this
   if (!in(code->kind,
-          10,
+          11,
           C_ASSIGN,
           C_ADD, C_SUB, C_MUL, C_DIV,
-          C_RETURN, C_FUNCTION, C_LABEL, C_GOTO, C_DEC
+          C_RETURN, C_FUNCTION, C_LABEL, C_GOTO, C_DEC,
+          C_IFGOTO
   ))
     return;
 
