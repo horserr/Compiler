@@ -7,6 +7,8 @@
 #include "utils.h"
 #endif
 
+#define distill_op(op) (op) = (op)->address
+
 typedef struct Operand {
   enum {
     O_TEM_VAR, O_LABEL,

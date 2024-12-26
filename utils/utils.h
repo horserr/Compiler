@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define either(target, first, second) \
+  ((target) == (first) || (target) == (second))
+
 #define DEBUG_INFO(message...) do {\
     fprintf(stderr, message); \
     fprintf(stderr, "Checking from {%s :%d @%s}.\n",\
@@ -47,6 +50,7 @@ const char* randomString(int len, const char *suffix);
 void error(int type, int lineNum, const char *message, ...);
 const char* int2String(int n);
 const char* float2String(float f);
+bool isInteger(const char *str);
 bool in(int target, int num, ...);
 
 void reverseArray(void *base, size_t len, size_t size);

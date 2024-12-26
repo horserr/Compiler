@@ -154,6 +154,8 @@ static UseInfoTable* createUseInfoTable(const BasicBlock *basic) {
       }
       (*use)[*len].in_use = false;
       (*use)[(*len)++].op = op;
+      if (either(op->kind, O_REFER, O_DEREF))
+        distill_op((*use)[*len - 1].op);
     }
   }
   // sort and remove duplicates
@@ -169,7 +171,7 @@ static void freeUseInfoTable(UseInfoTable *table) {
 }
 
 #define search(key, table, cmp_fn) \
-    bsearch(&key, table->use, table->len, sizeof(use_info), cmp_fn)
+    bsearch(&(key), (table)->use, (table)->len, sizeof(use_info), (cmp_fn))
 
 /**
  * @brief update use-info table with <b>'effective'</b> variables of the given current code
@@ -178,9 +180,9 @@ static void freeUseInfoTable(UseInfoTable *table) {
  */
 static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
 #define update(target_op, is_alive, table, cmp_fn) do {\
-    use_info *find = search((use_info){.op = target_op}, table, cmp_fn);\
+    use_info *find = search((use_info){.op = (target_op)}, (table), (cmp_fn));\
     assert(find != NULL);\
-    find->in_use = is_alive;\
+    find->in_use = (is_alive);\
   } while (false)
 
   assert(table != NULL);
@@ -190,22 +192,31 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
   // result operand is always the first operand lower in memory
   const Operand *result = (Operand *) &code->as;
   // todo refine this
+  // ignore it if return a constant
   if (kind == C_RETURN && result->kind == O_CONSTANT) return;
   assert(in(result->kind, EFFECTIVE_OP));
-  /* Note: if kind is C_RETURN, then the in_use attribute should be updated
-  to be true. Therefore, ignore it and continue to for loop.*/
+  // Note: if kind is C_RETURN, then the in_use attribute should be updated to be true.
   if (kind == C_RETURN) {
     update(result, true, table, cmp_use_info);
     return;
   }
-  update(result, false, table, cmp_use_info);
 
-  // iterate through those operands that are on the right side of equal sign
-  for (int i = 1; i < operand_count_per_code[kind]; ++i) {
+  int start_index = 0; // set the start index for the below `for` loop
+  if (!either(result->kind, O_REFER, O_DEREF)) {
+    // normal case
+    // if kind includes C_DEC, then use info set to false
+    update(result, false, table, cmp_use_info);
+    start_index = 1;
+  }
+
+#define check_distill_op(op) \
+  either((op)->kind, O_REFER, O_DEREF) ? (op)->address : (op)
+
+  for (int i = start_index; i < operand_count_per_code[kind]; ++i) {
     const Operand *op = result + i;
     // do not update variables whose kind isn't within effective operands
     if (!in(op->kind, EFFECTIVE_OP)) continue;
-    update(op, true, table, cmp_use_info);
+    update(check_distill_op(op), true, table, cmp_use_info);
   }
 #undef update
 }
@@ -214,7 +225,7 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
  * @brief copy the current state of use-info table into the info list.
  * for each code, only copy those effective variables that appear in it.
  */
-static void setUseInfo(info *info, const Chunk *chunk, const UseInfoTable *table) {
+static void copyUseInfo(info *info, const Chunk *chunk, const UseInfoTable *table) {
   info->currentLine = chunk;
   const int kind = chunk->code.kind;
   assert(in(kind, EFFECTIVE_CODE));
@@ -224,12 +235,14 @@ static void setUseInfo(info *info, const Chunk *chunk, const UseInfoTable *table
     // only search effective operands
     if (!in(op->kind, EFFECTIVE_OP)) continue;
 
-    const use_info *find = search((use_info){.op = op}, table, cmp_use_info);
+    const use_info *find = search((use_info){.op = check_distill_op(op)},
+                                  table, cmp_use_info);
     assert(find != NULL);
     memcpy(info->use + i, find, sizeof(use_info));
   }
 }
 
+#undef check_distill_op
 #undef search
 
 // set info for each line of code inside the basic block
@@ -247,7 +260,7 @@ static void setInfo(BasicBlock *basic) {
     if (!in(chunk->code.kind, EFFECTIVE_CODE)) goto CONTINUE;
     if (*len >= capacity) goto RESIZE;
     // get a snapshot of the current state of use-info table
-    setUseInfo(&(*info_)[(*len)++], chunk, table);
+    copyUseInfo(&(*info_)[(*len)++], chunk, table);
     // update the use-info table with the current code
     updateUseInfoTable(&chunk->code, table);
   CONTINUE:
@@ -294,7 +307,7 @@ static Block* partitionChunk(const Chunk *sentinel) {
     if (*cnt >= capacity) goto RESIZE;
 
     // todo refine this
-    const Chunk *target = in(c->kind, 2, C_FUNCTION, C_LABEL)
+    const Chunk *target = either(c->kind, C_FUNCTION, C_LABEL)
                             ? chunk
                             : chunk->next;
     // check for duplication before adding
@@ -346,7 +359,7 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
   while (chunk != sentinel) {
     bool need_remove = true;
     Code *c = &chunk->code;
-    chunk = chunk->next; // chunk is now pointing to next code
+    chunk = chunk->next; // chunk is now pointing to the next code
     foldConstant(c);
     organizeOpSequence(c);
 
@@ -375,12 +388,13 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
     Operand *op1 = &chunk->code.as.binary.op1;
     Operand *op2 = &chunk->code.as.binary.op2;
 
-    if (in(O_TEM_VAR, 2, op1->kind, op2->kind)) {
-      if (in(prev_left->var_no, 2, op1->var_no, op2->var_no)) {
+
+    if (either(O_TEM_VAR, op1->kind, op2->kind)) {
+      if (either(prev_left->var_no, op1->var_no, op2->var_no)) {
         target = op1->var_no == prev_left->var_no ? op1 : op2;
         goto FOUND;
       }
-    } else if (in(O_VARIABLE, 2, op1->kind, op2->kind)) {
+    } else if (either(O_VARIABLE, op1->kind, op2->kind)) {
       need_remove = false;
       if (op1->kind == O_VARIABLE &&
           strcmp(op1->value_s, prev_left->value_s) == 0) {

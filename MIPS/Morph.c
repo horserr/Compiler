@@ -12,7 +12,7 @@ typedef const char *RegType;
 static FILE *f = NULL;
 static use_info *USE_INFO = NULL;
 #define CHECK_FREE(i, op_) do { \
-    assert(cmp_operand(USE_INFO[i].op, op_) == 0);\
+    assert(cmp_operand(USE_INFO[i].op, (op_)) == 0);\
     if (!USE_INFO[i].in_use) freeReg(op_);\
   } while (false)
 
@@ -67,7 +67,7 @@ static void printLoadImm(const RegType reg, const int val) {
   free(im);
 }
 
-static void printSaveOrLoad(const char *T, const RegType reg,
+static void print_save_load(const char *T, const RegType reg,
                             const unsigned offset, const RegType base_reg) {
   assert(strcmp(T, "sw") == 0 || strcmp(T, "lw") == 0);
   char buffer[16];
@@ -76,7 +76,7 @@ static void printSaveOrLoad(const char *T, const RegType reg,
 }
 
 // always return the index of available register
-static int findAvailReg() {
+static int getAvailReg() {
   if (deque.size == LEN) { // spill register
     // fixme
     assert(false);
@@ -88,7 +88,7 @@ static int findAvailReg() {
 }
 
 static RegType allocateReg(const Operand *op) {
-  const int index = findAvailReg();
+  const int index = getAvailReg();
   pair *find = &deque.pairs[index];
   find->next_i = -1;
   find->prev_i = pairs_sentinel.prev_i;
@@ -132,8 +132,8 @@ static RegType ensureReg(const Operand *op) {
     return regsPool[index];
   // not find
   const RegType result_reg = allocateReg(op);
-  // fixme
-  printSaveOrLoad("lw", result_reg, 0, "hh");
+  // fixme move sp and save variables
+  print_save_load("lw", result_reg, 0, "hh");
   return result_reg;
 }
 
@@ -209,56 +209,183 @@ static void printRETURN(const Code *code) {
 //   free(label);
 // }
 
+static void printDEC(const Code *code) {
+  assert(code->kind == C_DEC);
+  const Operand *op = &code->as.dec.target;
+
+  // todo extract into a function
+  fprintf(f, "addi $sp, $sp, -%d\n", code->as.dec.size);
+  const RegType dec = ensureReg(op);
+  // fixme move stack pointer and allocate space
+  CHECK_FREE(0, op);
+  printBinary("move", dec, "$sp");
+}
+
+/**
+ * helper function for `printASSIGN`, `printArithmatic`, `printADDI`
+ * @param kind only support assign, add, sub, mul, div
+ * @param result the left-hand side operand
+ * @param ... All parameters passed in are RegType, which are
+ *    right-hand side operand(s).
+ * If kind is assignment, then receives one argument; else receives two.
+ *
+ *  There are four parts of the below code.
+ *  First, it deals with a special case which is assignment.
+ *    @if The result is `O_DEREF`, then use the given register of the
+ *    right-hand side without sparing a new register.
+ *    @else The normal case that uses move.
+ *  Second, it checks whether the result is `O_DEREF` type.
+ *    @if It isn't, the code will only execute the first two parts.
+ *    @else It will first tackle the right-hand side operand(s) aided
+ *  with previously found temporary register and then save to memory.
+ */
+static void leftHelper(const int kind, const Operand *result, ...) {
+  assert(in(kind, 5, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV));
+  va_list regs;
+  va_start(regs, kind == C_ASSIGN ? 1 : 2);
+  if (kind == C_ASSIGN) {
+    const RegType right_reg = va_arg(regs, RegType);
+    if (result->kind == O_DEREF) {
+      distill_op(result);
+      const RegType result_reg = ensureReg(result);
+      CHECK_FREE(0, result);
+      print_save_load("sw", right_reg, 0, result_reg);
+    } else {
+      const RegType result_reg = ensureReg(result);
+      CHECK_FREE(0, result);
+      printBinary("move", result_reg, right_reg);
+    }
+    return va_end(regs);
+  }
+
+  int index;
+  if (result->kind == O_DEREF) {
+    index = getAvailReg();
+    markRegEmpty(index);
+  } else {
+    ensureReg(result);
+    index = findInPairs(result);
+    assert(index != -1);
+    CHECK_FREE(0, result);
+  }
+
+  const RegType op1_reg = va_arg(regs, RegType);
+  const RegType op2_reg = va_arg(regs, RegType);
+  if (kind == C_DIV) {
+    printBinary("div", op1_reg, op2_reg);
+    printUnary("mflo", regsPool[index]);
+  } else {
+    const char *name;
+    if (isInteger(op2_reg)) {
+      name = "addi";
+    } else {
+      const char *n[] = {[C_ADD] = "add", [C_SUB] = "sub", [C_MUL] = "mul"};
+      name = n[kind];
+    }
+    printTernary(name, regsPool[index], op1_reg, op2_reg);
+  }
+  va_end(regs);
+
+  if (result->kind == O_DEREF) {
+    distill_op(result);
+    const RegType result_reg = ensureReg(result);
+    CHECK_FREE(0, result);
+    print_save_load("sw", regsPool[index], 0, result_reg);
+  }
+}
+
+typedef struct {
+  bool is_tmp;
+  int reg_index;
+} RegHelper;
+
+/**
+ * helper function for `printASSIGN`, `printArithmatic`, `printADDI`
+ * @param op the operand on the right-hand side
+ * @return a struct determines whether the allocated register is temporary and its index
+ * @note the reason why the parameter is a double pointer is that after passing
+ * through this function, the direct pointer of operand needs to be changed, if originally
+ * the operand's type if `O_DEREF` and `O_REF`.
+ */
+static RegHelper rightHelper(const Operand **op) {
+  assert(in((*op)->kind,
+    1 + EFFECTIVE_OP, O_CONSTANT));
+  int index;
+  bool is_tmp;
+  if ((*op)->kind == O_CONSTANT) {
+    is_tmp = true;
+    index = getAvailReg();
+    printLoadImm(regsPool[index], (*op)->value);
+  } else if ((*op)->kind == O_DEREF) {
+    is_tmp = true;
+    distill_op(*op);
+    const RegType op1_reg = ensureReg(*op);
+    index = getAvailReg();
+    CHECK_FREE(1, *op); // this register isn't needed any more.
+    print_save_load("lw", regsPool[index],
+                    0, op1_reg);
+  } else { // reference or variable
+    is_tmp = false;
+    if ((*op)->kind == O_REFER)
+      distill_op(*op);
+    ensureReg(*op);
+    index = findInPairs(*op);
+    assert(index != -1);
+  }
+  return (RegHelper){.is_tmp = is_tmp, .reg_index = index};
+}
+
+// the below two macros are related with RegHelper
+/** reg_ gets the register name within registers' pool */
+#define reg_(op) regsPool[op##_helper.reg_index]
+/** free_reg_ checks whether a register needs to be freed.
+ *    @if is temporary register, then directly mark empty
+ *    @else use normal `CHECK_FREE` macro
+ */
+#define free_reg_(i, op) \
+  if (op##_helper.is_tmp) {\
+    markRegEmpty(op##_helper.reg_index);\
+  } else {\
+    CHECK_FREE(i, op);\
+  }
+
 static void printASSIGN(const Code *code) {
   assert(code->kind == C_ASSIGN);
-  const Operand *left = &code->as.assign.left;
   const Operand *right = &code->as.assign.right;
-  assert(right->kind != O_REFER);
-  assert(!(left->kind == O_DEREF && right->kind == O_DEREF));
-
-  if (right->kind == O_CONSTANT) {
-    const RegType left_reg = allocateReg(left);
+  const Operand *left = &code->as.assign.left;
+  /** It is feasible to resort to `rightHelper` if the right
+   * operand is constant though. But this leads to redundant
+   * `li` and `move` commands which can be replaced with a
+   * single `li`. */
+  if (right->kind == O_CONSTANT &&
+      either(left->kind, O_VARIABLE, O_TEM_VAR)) {
+    const RegType left_reg = ensureReg(left);
     CHECK_FREE(0, left);
-    printLoadImm(left_reg, right->value);
-    return;
+    return printLoadImm(left_reg, right->value);
   }
 
-  const RegType right_reg = ensureReg(right);
-  CHECK_FREE(1, right);
-  const RegType left_reg = allocateReg(left);
-  CHECK_FREE(0, left);
+  const RegHelper right_helper = rightHelper(&right);
+  free_reg_(1, right);
 
-  if (left->kind == O_DEREF) {
-    // todo
-    printSaveOrLoad("sw", left_reg, 0, right_reg);
-    return;
-  }
-  if (right->kind == O_DEREF) {
-    // todo
-    printSaveOrLoad("lw", left_reg, 0, right_reg);
-    return;
-  }
-  printBinary("move", left_reg, right_reg);
+  leftHelper(C_ASSIGN, left, reg_(right));
 }
 
 static void printAddI(const Code *code) {
   assert(code->kind == C_ADD);
   const Operand *op1 = &code->as.binary.op1;
   const Operand *op2 = &code->as.binary.op2;
-  assert(in(O_CONSTANT,2, op1->kind, op2->kind));
+  assert(either(O_CONSTANT, op1->kind, op2->kind));
 
   if (op1->kind == O_CONSTANT)
     SWAP(op1, op2, sizeof(Operand));
-  // op1 is variable while op2 is constant
-  const RegType op1_reg = ensureReg(op1);
-  CHECK_FREE(1, op1);
+
+  const RegHelper op1_helper = rightHelper(&op1);
+  free_reg_(1, op1);
 
   const Operand *result = &code->as.binary.result;
-  const RegType result_reg = allocateReg(result);
-  CHECK_FREE(0, result);
-  char *immediate = (char *) int2String(op2->value);
-  printTernary("addi", result_reg, op1_reg, immediate);
-  free(immediate);
+  const RegType imme = int2String(op2->value);
+  leftHelper(C_ADD, result, reg_(op1), imme);
+  free((void *) imme);
 }
 
 static void printArithmatic(const Code *code) {
@@ -267,49 +394,27 @@ static void printArithmatic(const Code *code) {
 
   const Operand *op1 = &code->as.binary.op1;
   const Operand *op2 = &code->as.binary.op2;
-  if (kind == C_ADD && in(O_CONSTANT, 2, op1->kind, op2->kind))
+  assert(!either(op2->kind, O_REFER, O_DEREF));
+  if (kind == C_ADD && either(O_CONSTANT, op1->kind, op2->kind))
     return printAddI(code);
 
-  RegType op1_reg, op2_reg;
-  int index1 = -1, index2 = -1;
-  // if one of the operands is constant, need to first load immediate
-  if (op1->kind == O_CONSTANT) {
-    index1 = findAvailReg();
-    op1_reg = regsPool[index1];
-    printLoadImm(op1_reg, op1->value);
-  } else {
-    op1_reg = ensureReg(op1);
-  }
-  if (op2->kind == O_CONSTANT) {
-    index2 = findAvailReg();
-    op2_reg = regsPool[index2];
-    printLoadImm(op2_reg, op2->value);
-  } else {
-    op2_reg = ensureReg(op2);
-  }
+  const RegHelper op1_helper = rightHelper(&op1);
+  const RegHelper op2_helper = rightHelper(&op2);
+  free_reg_(1, op1);
+  free_reg_(2, op2);
 
-  if (op1->kind != O_CONSTANT)
-    CHECK_FREE(1, op1);
-  if (op2->kind != O_CONSTANT)
-    CHECK_FREE(2, op2);
-  const RegType result_reg = allocateReg(&code->as.binary.result);
-  if (kind == C_DIV) {
-    printBinary("div", op1_reg, op2_reg);
-    printUnary("mflo", result_reg);
-  } else {
-    const char *name[] = {[C_ADD] = "add", [C_SUB] = "sub", [C_MUL] = "mul"};
-    printTernary(name[kind], result_reg, op1_reg, op2_reg);
-  }
-  // free the temporary register if the operand is constant
-  if (index1 != -1) markRegEmpty(index1);
-  if (index2 != -1) markRegEmpty(index2);
+  const Operand *result = &code->as.binary.result;
+  assert(result->kind != O_REFER);
+  leftHelper(kind, result, reg_(op1), reg_(op2));
 }
+#undef free_reg_
+#undef reg_
 
 static void print(const Code *code) {
 #define elem(T) [C_##T] = print##T
   const FuncPtr dispatch[] = {
     elem(ASSIGN),
-    elem(FUNCTION), elem(GOTO), elem(LABEL), elem(RETURN),
+    elem(FUNCTION), elem(GOTO), elem(LABEL), elem(RETURN), elem(DEC),
     // elem(IFGOTO),
     [C_ADD] = printArithmatic,
     [C_SUB] = printArithmatic,
@@ -318,10 +423,10 @@ static void print(const Code *code) {
   };
   // todo remove this
   if (!in(code->kind,
-          9,
+          10,
           C_ASSIGN,
           C_ADD, C_SUB, C_MUL, C_DIV,
-          C_RETURN, C_FUNCTION, C_LABEL, C_GOTO
+          C_RETURN, C_FUNCTION, C_LABEL, C_GOTO, C_DEC
   ))
     return;
 

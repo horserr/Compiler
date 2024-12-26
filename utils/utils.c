@@ -62,6 +62,20 @@ const char* float2String(const float f) {
   return s;
 }
 
+bool isInteger(const char *str) {
+  assert(str != NULL);
+  const size_t len = strlen(str);
+  size_t start_index = 0;
+  if (either(str[0], '-', '+')) {
+    if (len == 1) return false;
+    start_index = 1;
+  }
+  for (size_t i = start_index; i < len; ++i)
+    if (!isdigit(str[i])) return false;
+
+  return true;
+}
+
 bool in(const int target, const int num, ...) {
   va_list args;
   va_start(args, num);
