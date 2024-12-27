@@ -1,6 +1,5 @@
 *build*/
 test/
-.idea/
 .vscode/
 deploy/
 !test/test.py
