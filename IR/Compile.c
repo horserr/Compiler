@@ -43,7 +43,7 @@ int tmp_cnt = 0;
 const SymbolTable *symbolTable;
 Chunk *sentinelChunk = NULL;
 
-// a handy way to get parameters information while inside `CompSt`
+// a handy way to get parameters' information while inside `CompSt`
 struct {
   int argc;
   // pointing to the function type
@@ -79,7 +79,12 @@ static Operand evalFuncInvocation(const ParseTNode *node) {
       addCode(sentinelChunk, CODE_UNARY(WRITE, stack[0]));
       return OP_CONSTANT(0);
     }
-    for (int j = top - 1; j >= 0; --j)
+    /** add this in proj4
+     *  output the fifth and latter code in reverse order
+     */
+    if (top >= 6)
+      reverseArray(stack + 4, top - 4, sizeof(Operand));
+    for (int j = 0; j < top; ++j)
       addCode(sentinelChunk, CODE_UNARY(ARG, stack[j]));
   }
   // i == 0 or i == 1
@@ -287,7 +292,7 @@ static Operand dereference(const ParseTNode *node) {
 static Operand compileExp(const ParseTNode *node) {
   assert(node != NULL);
   assert(strcmp(node->name,"Exp") == 0);
-  // notice: remove AND, OR, RELOP, NOT. They are now inside compileCondition.
+  // Notice: remove AND, OR, RELOP, NOT. They are now inside compileCondition.
   const char *expressions[] = {
     [0] = "Exp ASSIGNOP Exp",
     [1] = "Exp PLUS Exp",
@@ -313,7 +318,7 @@ static Operand compileExp(const ParseTNode *node) {
     const Operand right = compileExp(getChild(node, 2));
     const Operand left = compileExp(getChild(node, 0));
     addCode(sentinelChunk, CODE_ASSIGN(left, right));
-    // if simply return right_op, this may cause double free error.
+    // if return right_op, this may cause double free error.
     return copyOperand(&right);
   }
   if (1 <= i && i <= 4)
@@ -564,7 +569,7 @@ static void compileCompSt(const ParseTNode *node) {
 
 static Operand compileParamDec(const ParseTNode *node) {
   assert(node != NULL);
-  assert(strcmp(node->name,"ParamDec") == 0);
+  assert(strcmp(node->name, "ParamDec") == 0);
   const char *expressions[] = {"Specifier VarDec"};
   assert(EXPRESSION_INDEX(node, expressions) == 0);
   return compileVarDec(getChildByName(node, "VarDec"), true);
@@ -597,7 +602,7 @@ static void compileFunDec(const ParseTNode *node) {
   };
   const int i = EXPRESSION_INDEX(node, expressions);
   const char *name = getStrFrom(node, ID);
-  const Operand func_op = (Operand){
+  const Operand func_op = {
     .kind = O_VARIABLE, .value_s = my_strdup(name)
   };
   addCode(sentinelChunk, CODE_UNARY(FUNCTION, func_op));

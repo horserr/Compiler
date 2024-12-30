@@ -75,4 +75,9 @@ void cleanOp(const Operand *op);
 void removeCode(Chunk *chunk);
 void freeChunk(const Chunk *sentinel);
 
+#ifdef LOCAL
+void printOp(FILE *f, const Operand *op);
+void printCode(FILE *f, const Code *c);
+#endif
+
 #endif

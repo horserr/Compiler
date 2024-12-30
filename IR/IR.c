@@ -14,16 +14,18 @@ const u_int8_t operand_count_per_code[] = {
   [C_DEC] = 1,
 };
 
+// note: o1 and o2 both are double pointer to operand
 int cmp_operand(const void *o1, const void *o2) {
+#define allowed_op 2, O_TEM_VAR, O_VARIABLE
   //the order of different operands
   const u_int8_t order[] = {
     [O_TEM_VAR] = 0, [O_VARIABLE] = 1,
   };
 
-  const Operand *op1 = (Operand *) o1, *op2 = (Operand *) o2;
+  const Operand *op1 = *(Operand **) o1, *op2 = *(Operand **) o2;
   // no constant
-  assert(op1 != NULL && in(op1->kind, EFFECTIVE_OP));
-  assert(op2 != NULL && in(op2->kind, EFFECTIVE_OP));
+  assert(op1 != NULL && in(op1->kind, allowed_op));
+  assert(op2 != NULL && in(op2->kind, allowed_op));
   const int kind1 = op1->kind, kind2 = op2->kind;
 
   if (kind1 != kind2) return order[kind1] - order[kind2];
@@ -31,6 +33,7 @@ int cmp_operand(const void *o1, const void *o2) {
   if (kind1 == O_TEM_VAR) return op1->var_no - op2->var_no;
   if (kind1 == O_VARIABLE) return strcmp(op1->value_s, op2->value_s);
   assert(false);
+#undef allowed_op
 }
 
 void initChunk(Chunk **sentinel) {
