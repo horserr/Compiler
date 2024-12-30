@@ -9,12 +9,13 @@
 #endif
 
 // remainder: only use these macros inside 'in' function
-// todo change this into an array and non-effective
-#define EFFECTIVE_CODE 8, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, C_RETURN, C_DEC, C_IFGOTO
+#define EFFECTIVE_CODE 10, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, \
+                           C_RETURN, C_DEC, C_IFGOTO, C_PARAM, C_ARG
+
 #define EFFECTIVE_OP   4, O_VARIABLE, O_TEM_VAR, O_DEREF, O_REFER
 
 typedef struct {
-  const Operand *op;
+  Operand *op;
   bool in_use;
 } use_info;
 
@@ -25,8 +26,10 @@ typedef struct {
 
 typedef struct {
   const Chunk *begin, *end;
-  int len;    // the number of code inside begin and end
-  info *info; // an array
+  int len;             // the amount of code
+  info *info;          // an array
+  int cnt;             // the number of variables
+  Operand **variables; // a list of pointers
 } BasicBlock;
 
 typedef struct {

@@ -13,8 +13,6 @@ extern const u_int8_t operand_count_per_code[];
 int cmp_use_info(const void *u1, const void *u2);
 /* print code is only for debug purpose, so declare it as
  `extern` rather than add it in the header file. */
-extern void printOp(FILE *f, const Operand *op);
-extern void printCode(FILE *f, const Code *c);
 
 /**
  * <pre>
@@ -39,7 +37,7 @@ static void flipCondition(const Chunk *sentinel) {
     const char *flipList[len] = {"==", "<", ">", "<=", ">=", "!="};
     char **relation = &c->as.ternary.relation;
     // search in flipList
-    const int index = findInArray(relation, flipList,
+    const int index = findInArray(relation,false, flipList,
                                   len, sizeof(char *), cmp_str);
     free(*relation); // maybe cause free after use warning.
     *relation = my_strdup(flipList[len - 1 - index]);
@@ -79,8 +77,8 @@ static void deleteLabels(const Chunk *sentinel) {
     const Code *c = &chunk->code;
     chunk = chunk->next;
     if (c->kind != C_LABEL) continue;
-    if (bsearch(&c->as.unary.var_no, container,
-                cnt, sizeof(int), cmp_int) != NULL)
+    if (findInArray(&c->as.unary.var_no, true, container,
+                    cnt, sizeof(int), cmp_int) != -1)
       continue;
     removeCode(chunk->prev);
   }
@@ -198,7 +196,7 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
 
   // result operand is always the first operand lower in memory
   const Operand *result = (Operand *) &code->as;
-  // todo refine this
+
   if (kind == C_RETURN && result->kind == O_CONSTANT) return;
   assert(in(result->kind, EFFECTIVE_OP));
   // Note: if kind is C_RETURN, then the in_use attribute should be updated to be true.
@@ -283,6 +281,13 @@ static void setInfo(BasicBlock *basic) {
     *info_ = realloc(*info_, sizeof(info) * capacity);
   }
   reverseArray(*info_, *len, sizeof(info));
+
+  // copy variables from table to basic block
+  basic->cnt = (int) table->len;
+  basic->variables = malloc(sizeof(Operand *) * table->len);
+  for (int i = 0; i < table->len; ++i) {
+    basic->variables[i] = table->use[i].op;
+  }
   freeUseInfoTable(table);
 }
 
@@ -344,19 +349,16 @@ static Block* partitionChunk(const Chunk *sentinel) {
 /** cascade (adjacent) arithmetic operations that only include
  * <b>"temporary"</b> constants
  * @return true if there are some constants that can be folded
- *
  *  @example:
  *  <pre>
  *  t0 := #2      |  t1 := #6
  *  t1 := t0 * 3  |
  *  </pre>
- *
  *  @example:
  *  <pre>
  *  a := 0        |  a := #0
  *  t0 := a * b   |  t0 := #0
  *  </pre>
- *
  *  @example:
  *  <pre>
  *  a := 1        |  a := #0
@@ -434,6 +436,12 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
 }
 
 static void printBasicBlock(const BasicBlock *basic) {
+  printf("all variables inside block.\n");
+  for (int i = 0; i < basic->cnt; ++i) {
+    printOp(stdout, basic->variables[i]);
+  }
+  printf("\n");
+
   for (int i = 0; i < basic->len; ++i) {
     const info *info_ = basic->info + i;
     const Chunk *chunk = info_->currentLine;
@@ -479,7 +487,9 @@ Block* optimize(const Chunk *sentinel) {
   deleteLabels(sentinel);
   Block *block = partitionChunk(sentinel);
 
+#ifdef LOCAL
   printBlock(block);
+#endif
   return block;
 }
 
@@ -487,14 +497,16 @@ void freeBlock(Block *block) {
   assert(block != NULL);
   for (int i = 0; i < block->cnt; ++i) {
     // free basic block
-    free((block->container + i)->info);
+    const BasicBlock *basic = block->container + i;
+    free(basic->info);
+    free(basic->variables);
   }
   free(block->container);
   free(block);
 }
 
 int cmp_use_info(const void *u1, const void *u2) {
-  return cmp_operand(((use_info *) u1)->op, ((use_info *) u2)->op);
+  return cmp_operand(&((use_info *) u1)->op, &((use_info *) u2)->op);
 }
 
 #undef EFFECTIVE_CODE

@@ -130,10 +130,14 @@ void removeDuplicates(void *base, size_t *len, const size_t size,
   *len = INDEX(base, base_, size) + 1;
 }
 
-// Find in sequential order in an array. Alas, the better approach is to use native `bsearch`
+// Find in sequential order in an array.
 __attribute__((warn_unused_result))
-int findInArray(const void *key, const void *base, const size_t len,
-                const size_t size, const __compar_fn_t cmp) {
+int findInArray(const void *key, const bool is_sorted, const void *base,
+                const size_t len, const size_t size, const __compar_fn_t cmp) {
+  if (is_sorted) {
+    const void *find = bsearch(key, base, len, size, cmp);
+    return find == NULL ? -1 : (int) INDEX(base, find, size);
+  }
   for (int i = 0; i < len; ++i) {
     const void *tmp = (char *) base + i * size;
     if (cmp(key, tmp) == 0) return i;
