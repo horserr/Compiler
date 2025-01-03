@@ -119,8 +119,10 @@ void reverseArray(void *base, const size_t len, const size_t size) {
  */
 void removeDuplicates(void *base, size_t *len, const size_t size,
                       const __compar_fn_t cmp) {
+  if (*len == 0) return; // fix a bug
+
   char *base_ = base;
-  for (int i = 1; i < *len; ++i) {
+  for (size_t i = 1; i < *len; ++i) {
     const void *p = (char *) base + i * size;
     if (cmp(base_, p) != 0) {
       base_ += size;
@@ -143,4 +145,14 @@ int findInArray(const void *key, const bool is_sorted, const void *base,
     if (cmp(key, tmp) == 0) return i;
   }
   return -1;
+}
+
+void shuffleArray(void *base, const size_t len, const size_t size) {
+  assert(len >= 1);
+  char *array = base;
+  srand(time(NULL));
+  for (size_t i = len - 1; i > 0; i--) {
+    const size_t j = rand() % (i + 1);
+    SWAP(array + i * size, array+ j * size, size);
+  }
 }

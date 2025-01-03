@@ -196,26 +196,18 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
 
   // result operand is always the first operand lower in memory
   const Operand *result = (Operand *) &code->as;
-
-  if (kind == C_RETURN && result->kind == O_CONSTANT) return;
+  if (in(kind, 3, C_RETURN, C_WRITE, C_ARG) && result->kind == O_CONSTANT) return;
   assert(in(result->kind, EFFECTIVE_OP));
-  // Note: if kind is C_RETURN, then the in_use attribute should be updated to be true.
-  if (kind == C_RETURN) {
-    assert(either(result->kind, O_TEM_VAR, O_VARIABLE));
-    update(result, true, table, cmp_use_info);
-    return;
-  }
 
   int start_index = 0;
-  if (!either(result->kind, O_REFER, O_DEREF)) { // normal case
+  u_int8_t op_cnt = operand_count_per_code[kind];
+  // Note: if kind is C_RETURN update it to be true
+  if (kind == C_IFGOTO) {
+    op_cnt--;
+  } else if (!(kind == C_RETURN || either(result->kind, O_REFER, O_DEREF))) {
     // if kind includes `C_DEC`, then use info set to false
     update(result, false, table, cmp_use_info);
     start_index = 1;
-  }
-  u_int8_t op_cnt = operand_count_per_code[kind];
-  if (kind == C_IFGOTO) {
-    start_index = 0;
-    op_cnt--;
   }
 
   for (int i = start_index; i < op_cnt; ++i) {

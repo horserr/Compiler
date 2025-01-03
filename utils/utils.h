@@ -2,12 +2,13 @@
 #define UTILITIES
 
 #include <assert.h>
-#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#define INDENT 2
 
 #define either(target, first, second) \
   ((target) == (first) || (target) == (second))
@@ -57,5 +58,6 @@ void reverseArray(void *base, size_t len, size_t size);
 void removeDuplicates(void *base, size_t *len, size_t size, __compar_fn_t cmp);
 int findInArray(const void *key, bool is_sorted, const void *base, size_t len,
                 size_t size, __compar_fn_t cmp);
+void shuffleArray(void *base, size_t len, size_t size);
 
 #endif

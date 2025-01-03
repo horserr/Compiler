@@ -66,11 +66,9 @@ int main(const int argc, char **argv) {
   const SymbolTable *table = buildTable(root);
   const Chunk *chunk = compile(root, table);
   Block *block = optimize(chunk);
-
 #ifdef LOCAL
   printChunk("test/out/out.ir", chunk);
 #endif
-
   printMIPS(argv[2], block);
 
   freeBlock(block);

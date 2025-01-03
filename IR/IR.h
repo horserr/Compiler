@@ -10,7 +10,7 @@
 #define distill_op(op) (op) = (op)->address
 
 typedef struct Operand {
-  enum {
+  enum { // total 7
     O_TEM_VAR, O_LABEL,
     O_CONSTANT,
     O_VARIABLE, O_INVOKE,
@@ -27,7 +27,7 @@ typedef struct Operand {
 
 // a single line of code
 typedef struct {
-  enum {
+  enum { // total 15
     C_READ, C_WRITE, C_FUNCTION, C_PARAM, C_ARG, C_LABEL, C_RETURN, C_GOTO,
     C_ASSIGN,
     C_ADD, C_SUB, C_MUL, C_DIV,

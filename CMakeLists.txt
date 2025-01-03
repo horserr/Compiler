@@ -33,9 +33,6 @@ target_link_libraries(sanitizer_flags INTERFACE ${SANITIZER_FLAGS})
 message(STATUS "ASAN_OPTIONS_LIST is ${ASAN_OPTIONS_LIST}")
 list(JOIN ASAN_OPTIONS_LIST ":" ASAN_OPTIONS)
 message(STATUS "ASAN_OPTIONS is ${ASAN_OPTIONS}")
-# Set sanitizer environment variables
-set_target_properties(sanitizer_flags PROPERTIES
-                      INTERFACE_COMPILE_DEFINITIONS "ASAN_OPTIONS=${ASAN_OPTIONS}")
 
 find_package(FLEX 2.6.4 REQUIRED)
 find_package(BISON 3.0.4 REQUIRED)

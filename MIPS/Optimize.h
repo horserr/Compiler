@@ -9,8 +9,8 @@
 #endif
 
 // remainder: only use these macros inside 'in' function
-#define EFFECTIVE_CODE 10, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, \
-                           C_RETURN, C_DEC, C_IFGOTO, C_PARAM, C_ARG
+#define EFFECTIVE_CODE 12, C_ASSIGN, C_ADD, C_SUB, C_MUL, C_DIV, \
+                           C_RETURN, C_DEC, C_IFGOTO, C_PARAM, C_ARG, C_READ, C_WRITE
 
 #define EFFECTIVE_OP   4, O_VARIABLE, O_TEM_VAR, O_DEREF, O_REFER
 
