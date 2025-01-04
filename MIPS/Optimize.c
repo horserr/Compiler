@@ -163,6 +163,7 @@ static UseInfoTable* createUseInfoTable(const BasicBlock *basic) {
   // sort and remove duplicates
   qsort(*use, *len, sizeof(use_info), cmp_use_info);
   removeDuplicates(*use, len, sizeof(use_info), cmp_use_info);
+  *use = realloc(*use, *len * sizeof(use_info));
   return table;
 }
 
@@ -197,7 +198,6 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
   // result operand is always the first operand lower in memory
   const Operand *result = (Operand *) &code->as;
   if (in(kind, 3, C_RETURN, C_WRITE, C_ARG) && result->kind == O_CONSTANT) return;
-  assert(in(result->kind, EFFECTIVE_OP));
 
   int start_index = 0;
   u_int8_t op_cnt = operand_count_per_code[kind];
@@ -310,12 +310,10 @@ static Block* partitionChunk(const Chunk *sentinel) {
 
   while (chunk != sentinel) {
     const Code *c = &chunk->code;
-    // fixme include function call and other types as well
     if (!in(c->kind, 4, C_LABEL, C_IFGOTO, C_GOTO, C_FUNCTION))
       goto CONTINUE;
     if (*cnt >= capacity) goto RESIZE;
 
-    // todo refine this
     const Chunk *target = either(c->kind, C_FUNCTION, C_LABEL)
                             ? chunk
                             : chunk->next;
@@ -356,8 +354,6 @@ static Block* partitionChunk(const Chunk *sentinel) {
  *  a := 1        |  a := #0
  *  t0 := a * b   |  t0 := b
  *  </pre>
- *
- *  @todo: can use more advanced methods, such as look ahead one line
  */
 static bool optimizeArithmatic(const Chunk *sentinel) {
   bool flag = false;
@@ -379,11 +375,13 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
     // check assignment
     if (chunk->code.kind == C_ASSIGN) {
       Operand *right = &chunk->code.as.assign.right;
-      if (right->kind == O_TEM_VAR && right->var_no == prev_left->var_no) {
+      if (right->kind == O_TEM_VAR && prev_left->kind == O_TEM_VAR
+          && right->var_no == prev_left->var_no) {
         target = right;
         goto FOUND;
       }
-      if (right->kind == O_VARIABLE && strcmp(right->value_s, prev_left->value_s) == 0) {
+      if (right->kind == O_VARIABLE && prev_left->kind == O_VARIABLE
+          && strcmp(right->value_s, prev_left->value_s) == 0) {
         need_remove = false;
         target = right;
         goto FOUND;
@@ -395,12 +393,12 @@ static bool optimizeArithmatic(const Chunk *sentinel) {
     Operand *op2 = &chunk->code.as.binary.op2;
 
 
-    if (either(O_TEM_VAR, op1->kind, op2->kind)) {
+    if (prev_left->kind == O_TEM_VAR && either(O_TEM_VAR, op1->kind, op2->kind)) {
       if (either(prev_left->var_no, op1->var_no, op2->var_no)) {
         target = op1->var_no == prev_left->var_no ? op1 : op2;
         goto FOUND;
       }
-    } else if (either(O_VARIABLE, op1->kind, op2->kind)) {
+    } else if (prev_left->kind == O_VARIABLE && either(O_VARIABLE, op1->kind, op2->kind)) {
       need_remove = false;
       if (op1->kind == O_VARIABLE &&
           strcmp(op1->value_s, prev_left->value_s) == 0) {
