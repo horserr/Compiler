@@ -36,6 +36,7 @@ libraries = [
     '../SymbolTable',
     '../utils',
     '../IR',
+    '../MIPS',
 ]
 files = [
     '../main.c',

@@ -24,7 +24,7 @@
   } while(false)
 
 #else
-#include "IR"
+#include "IR.h"
 #include "Morph.h"
 #define PRINT_INFO(op, message...)
 #define BACK_FILL(reg)
@@ -67,7 +67,7 @@ static const RegType regsPool[] = {
   "$v1", "$v0",
   "$a0", "$a1", "$a2", "$a3",
 };
-static const size_t LEN = ARRAY_LEN(regsPool);
+#define LEN (ARRAY_LEN(regsPool))
 
 typedef struct {
   int next_i, prev_i; // next index and previous index
@@ -338,12 +338,15 @@ static int seizeReg(const RegType avoidance) {
   findInArray(&pair_, false, deque.pairs + begin, len, sizeof(pair), cmp_pair)
 
   PRINT_INFO(NULL, "");
+  // fix: what if avoidance's index is always 0
   int reg_index = 0;
-
-  for (int i = 0; i < LEN - deque.size; ++i) {
-    reg_index += find_in_pairs(EMPTY_PAIR, reg_index, LEN - reg_index);
+  while (reg_index < LEN) {
+    const int i = find_in_pairs(EMPTY_PAIR, reg_index, LEN - reg_index);
+    if (i == -1) break;
+    reg_index += i;
     if (avoidance == NULL || strcmp(regsPool[reg_index], avoidance) != 0)
       goto RETURN;
+    reg_index++;
   }
   // deque.size == LEN or happen to find avoidance register
   reg_index = pairs_sentinel.next_i;
@@ -423,8 +426,8 @@ static void freeReg(const Operand *op) {
  * initialized at the beginning of function, while only
  * arguments' counter will be reset after the function invocation. */
 static struct { // no more than 4
-  u_int8_t arg;
-  u_int8_t param;
+  uint8_t arg;
+  uint8_t param;
 } counter;
 
 static void printFUNCTION(const Code *code) {
@@ -452,8 +455,8 @@ static void printPARAM(const Code *code) {
     char courier[4];
     snprintf(courier, sizeof(courier), "$a%d", counter.param);
     // pass the register's ownership to the operand
-    adoptReg(courier, true, receiver); // ad->reg_index will be set within `adoptReg`
-    CHECK_FREE(0, receiver);           // note: remember to free
+    adoptReg(courier, false, receiver); // ad->reg_index will be set within `adoptReg`
+    CHECK_FREE(0, receiver);            // note: remember to free
   } else {
     // the caller has already saved the value on stack
     ad->offset = (counter.param - 4) * ELEM_SIZE;
@@ -462,6 +465,67 @@ static void printPARAM(const Code *code) {
   counter.param++;
 }
 #undef is_in_reg
+
+typedef struct {
+  bool is_tmp;
+  int reg_index;
+} RegHelper;
+
+// the below two macros are related with RegHelper
+/** reg_ gets the register name within registers' pool */
+#define reg_(op) regsPool[op##_helper.reg_index]
+/** free_reg_helper checks whether a register needs to be freed.
+ *    if is temporary register, then directly mark empty
+ *    else use normal `CHECK_FREE` macro
+ */
+#define free_reg_helper(i, op) \
+  if (op##_helper.is_tmp) {\
+    removeReg(op##_helper.reg_index);\
+  } else {\
+    CHECK_FREE(i, op);\
+  }
+
+/**
+ * @brief Allocates a register for the right-hand side operand.
+ *
+ * This function allocates a register for the right-hand side operand of an assignment or arithmetic operation.
+ * It handles different types of operands, including constants, dereferenced values, and variables.
+ *
+ * @param index The index of the operand in the operand array.
+ * @param op The operand on the right-hand side.
+ * @param avoidance The register to be avoided during allocation.
+ * @return A struct containing information about whether the allocated register is temporary and its index.
+ */
+static RegHelper rightHelper(const int index, const Operand **op, const RegType avoidance) {
+#define helper_(is_tmp_, reg_index_) (RegHelper){\
+  .is_tmp = is_tmp_, .reg_index = reg_index_\
+}
+  const int kind = (*op)->kind;
+  assert(in(kind, 1 + EFFECTIVE_OP, O_CONSTANT));
+  int reg_index;
+  if (kind == O_CONSTANT) {
+    reg_index = seizeReg(avoidance);
+    printLoadImm(regsPool[reg_index], (*op)->value);
+    return helper_(true, reg_index);
+  }
+  if (kind == O_DEREF) {
+    distill_op(*op);
+    const RegType op1_reg = ensureReg(*op, true, avoidance);
+    reg_index = seizeReg(avoidance);
+    print_save_load("lw", regsPool[reg_index], 0, op1_reg);
+    // fix a bug
+    CHECK_FREE(index, *op); // this register may not need any more.
+    return helper_(true, reg_index);
+  }
+  // reference or variable
+  if (kind == O_REFER)
+    distill_op(*op);
+  const RegType reg = ensureReg(*op, true, avoidance);
+  reg_index = find_in_regs(reg);
+  assert(reg_index != -1);
+  return helper_(false, reg_index);
+#undef helper_
+}
 
 /**
  * @warning I have changed the sequence of argument from reverse
@@ -488,21 +552,23 @@ static void printARG(const Code *code) {
     goto RETURN;
   }
 
+  // fix: arguments can be deref type.
+  RegHelper provider_helper;
   if (counter.arg < 4) {
     const char courier[4];
     snprintf(courier, sizeof(courier), "$a%d", counter.arg);
-    const RegType reg = ensureReg(provider, true, courier);
+    provider_helper = rightHelper(0, &provider, courier);
+    // const RegType reg = ensureReg(provider, true, courier);
     if (!is_reg_empty(courier)) spillReg(courier);
 
-    // can't use check free, because the register has unlinked
-    if (strcmp(courier, reg) == 0) goto RETURN;
-    printBinary("move", courier, reg);
+    assert(strcmp(courier, reg_(provider)) != 0);
+    printBinary("move", courier, reg_(provider));
   } else {
-    const RegType reg = ensureReg(provider, true, NULL);
+    provider_helper = rightHelper(0, &provider, NULL);
     adjustPtr(EXPAND, ELEM_SIZE);
-    print_save_load("sw", reg, frameOffset, "$fp");
+    print_save_load("sw", reg_(provider), frameOffset, "$fp");
   }
-  CHECK_FREE(0, provider);
+  free_reg_helper(0, provider);
 RETURN:
   counter.arg++;
 }
@@ -516,10 +582,11 @@ static void printRETURN(const Code *code) {
     if (!is_reg_empty(courier)) spillReg(courier);
     printLoadImm(courier, provider->value);
   } else {
-    const RegType reg = ensureReg(provider, true, courier);
+    // fix: the provider can be deref type.
+    const RegHelper provider_helper = rightHelper(0, &provider, courier);
     if (!is_reg_empty(courier)) spillReg(courier);
-    printBinary("move", courier, reg);
-    CHECK_FREE(0, provider);
+    printBinary("move", courier, reg_(provider));
+    free_reg_helper(0, provider);
   }
 
   // arg counter should be reset
@@ -570,7 +637,7 @@ static void printInvoke(const Code *code) {
    *  use `adoptReg` rather than `printBinary("move", result_reg, "$v0");`,
        because the result operand will be refreshed anyway.
    *  adoptReg` doesn't cause a spill, as everything has already been spilled beforehand. */
-  adoptReg("$v0", true, result);
+  adoptReg("$v0", false, result);
   // $v0 has already been adopted, so no need to restore
   fake_flush_restore('l', "$v0");
   CHECK_FREE(0, result); // note: remember to free
@@ -580,7 +647,6 @@ static void printInvoke(const Code *code) {
     adjustPtr(SHRINK, (counter.arg - 4) * ELEM_SIZE);
   counter.arg = 0; // reset arg counter
 }
-
 #undef ELEM_SIZE
 
 static void printREAD(const Code *code) {
@@ -596,10 +662,9 @@ static void printREAD(const Code *code) {
   const RegType courier = "$v0";
   if (!is_reg_empty(courier)) spillReg(courier);
   printUnary("jal", "read");
-  adoptReg(courier, true, receiver);
+  adoptReg(courier, false, receiver);
   CHECK_FREE(0, receiver); // note: remember to free
 }
-
 #undef is_addr_descriptor_valid
 
 /**
@@ -667,69 +732,7 @@ static void leftHelper(const int kind, const Operand *result, ...) {
   }
   CHECK_FREE(0, result);
 }
-
-typedef struct {
-  bool is_tmp;
-  int reg_index;
-} RegHelper;
-
-/**
- * @brief Allocates a register for the right-hand side operand.
- *
- * This function allocates a register for the right-hand side operand of an assignment or arithmetic operation.
- * It handles different types of operands, including constants, dereferenced values, and variables.
- *
- * @param index The index of the operand in the operand array.
- * @param op The operand on the right-hand side.
- * @param avoidance The register to be avoided during allocation.
- * @return A struct containing information about whether the allocated register is temporary and its index.
- */
-static RegHelper rightHelper(const int index, const Operand **op, const RegType avoidance) {
-#define helper_(is_tmp_, reg_index_) (RegHelper){\
-  .is_tmp = is_tmp_, .reg_index = reg_index_\
-}
-  const int kind = (*op)->kind;
-  assert(in(kind, 1 + EFFECTIVE_OP, O_CONSTANT));
-  int reg_index;
-  if (kind == O_CONSTANT) {
-    reg_index = seizeReg(avoidance);
-    printLoadImm(regsPool[reg_index], (*op)->value);
-    return helper_(true, reg_index);
-  }
-  if (kind == O_DEREF) {
-    distill_op(*op);
-    const RegType op1_reg = ensureReg(*op, true, avoidance);
-    reg_index = seizeReg(avoidance);
-    print_save_load("lw", regsPool[reg_index], 0, op1_reg);
-    // fix a bug
-    CHECK_FREE(index, *op); // this register may not need any more.
-    return helper_(true, reg_index);
-  }
-  // reference or variable
-  if (kind == O_REFER)
-    distill_op(*op);
-  const RegType reg = ensureReg(*op, true, avoidance);
-  reg_index = find_in_regs(reg);
-  assert(reg_index != -1);
-  return helper_(false, reg_index);
-#undef helper_
-}
 #undef find_in_regs
-
-// the below two macros are related with RegHelper
-
-/** reg_ gets the register name within registers' pool */
-#define reg_(op) regsPool[op##_helper.reg_index]
-/** free_reg_ checks whether a register needs to be freed.
- *    if is temporary register, then directly mark empty
- *    else use normal `CHECK_FREE` macro
- */
-#define free_reg_(i, op) \
-  if (op##_helper.is_tmp) {\
-    removeReg(op##_helper.reg_index);\
-  } else {\
-    CHECK_FREE(i, op);\
-  }
 
 static void printASSIGN(const Code *code) {
   assert(code->kind == C_ASSIGN);
@@ -750,7 +753,7 @@ static void printASSIGN(const Code *code) {
   }
 
   const RegHelper right_helper = rightHelper(1, &right, NULL);
-  free_reg_(1, right);
+  free_reg_helper(1, right);
 
   leftHelper(C_ASSIGN, left, reg_(right));
 }
@@ -761,11 +764,15 @@ static void printAddI(const Code *code) {
   const Operand *op2 = &code->as.binary.op2;
   assert(either(O_CONSTANT, op1->kind, op2->kind));
 
-  if (op1->kind == O_CONSTANT)
+  // fix: the index for use_info should also be updated
+  int index = 1; // assume the first operand isn't constant
+  if (op1->kind == O_CONSTANT) {
     SWAP(op1, op2, sizeof(Operand));
+    index = 2;
+  }
 
-  const RegHelper op1_helper = rightHelper(1, &op1, NULL);
-  free_reg_(1, op1);
+  const RegHelper op1_helper = rightHelper(index, &op1, NULL);
+  free_reg_helper(index, op1);
 
   const Operand *result = &code->as.binary.result;
   const RegType imme = int2String(op2->value);
@@ -784,10 +791,17 @@ static void printArithmatic(const Code *code) {
   if (kind == C_ADD && either(O_CONSTANT, op1->kind, op2->kind))
     return printAddI(code);
 
+  // fix: what if two operands are the same?
+  const bool same = cmp_operand(&op1, &op2) == 0;
   const RegHelper op1_helper = rightHelper(1, &op1, NULL);
-  const RegHelper op2_helper = rightHelper(2, &op2, reg_(op1));
-  free_reg_(1, op1);
-  free_reg_(2, op2);
+  free_reg_helper(1, op1);
+  RegHelper op2_helper;
+  if (same) {
+    op2_helper.reg_index = op1_helper.reg_index;
+  } else {
+    op2_helper = rightHelper(2, &op2, reg_(op1));
+    free_reg_helper(2, op2);
+  }
 
   const Operand *result = &code->as.binary.result;
   assert(result->kind != O_REFER);
@@ -809,13 +823,21 @@ static void printIFGOTO(const Code *code) {
   const int index = findInArray(&relation, false, map,
                                 ARRAY_LEN(map), sizeof(map[0]), cmp_str);
   assert(index != -1);
+  // fix: same problem with printArithmatic, two operands may be the same
   const Operand *x = &code->as.ternary.x;
-  const RegHelper x_helper = rightHelper(0, &x, NULL);
   const Operand *y = &code->as.ternary.y;
-  const RegHelper y_helper = rightHelper(1, &y, reg_(x));
+  const bool same = cmp_operand(&x, &y) == 0;
 
-  free_reg_(0, x);
-  free_reg_(1, y);
+  const RegHelper x_helper = rightHelper(0, &x, NULL);
+  free_reg_helper(0, x);
+
+  RegHelper y_helper;
+  if (same) {
+    y_helper.reg_index = x_helper.reg_index;
+  } else {
+    y_helper = rightHelper(1, &y, reg_(x));
+    free_reg_helper(1, y);
+  }
 
   char label[16];
   snprintf(label, sizeof(label), "label%d", code->as.ternary.label.var_no);
@@ -839,12 +861,12 @@ static void printWRITE(const Code *code) {
     assert(strcmp(courier, reg_(provider)) != 0);
     if (!is_reg_empty(courier)) spillReg(courier);
     printBinary("move", courier, reg_(provider));
-    free_reg_(0, provider);
+    free_reg_helper(0, provider);
   }
   // note: write function promises to leave registers untouched
   printUnary("jal", "write");
 }
-#undef free_reg_
+#undef free_reg_helper
 #undef reg_
 
 static void printLABEL(const Code *code) {
@@ -1044,8 +1066,9 @@ static void init_MIPS() {
   printUnary("jal", "main");
   printBinary("li", "$v0", "10");
   fprintf(f, "%*ssyscall\n",INDENT, "");
-
+#ifdef LOCAL
   fprintf(f, "# END initialization\n");
+#endif
 }
 #undef CHECK_FREE
 #undef EXPAND

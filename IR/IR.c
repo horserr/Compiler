@@ -3,10 +3,9 @@
 #else
 #include "IR.h"
 #endif
-#include "../MIPS/Optimize.h"
 
 // a list contains the number of operands for each kind of code
-const u_int8_t operand_count_per_code[] = {
+const uint8_t operand_count_per_code[] = {
   [C_READ] = 1, [C_WRITE] = 1, [C_FUNCTION] = 1, [C_PARAM] = 1,
   [C_LABEL] = 1, [C_RETURN] = 1, [C_GOTO] = 1, [C_ARG] = 1,
   [C_ASSIGN] = 2,
@@ -16,10 +15,10 @@ const u_int8_t operand_count_per_code[] = {
 
 // note: o1 and o2 both are double pointer to operand
 int cmp_operand(const void *o1, const void *o2) {
-#define allowed_op 2, O_TEM_VAR, O_VARIABLE
+#define allowed_op 5, O_TEM_VAR, O_VARIABLE, O_CONSTANT, O_REFER, O_DEREF
   //the order of different operands
-  const u_int8_t order[] = {
-    [O_TEM_VAR] = 0, [O_VARIABLE] = 1,
+  const uint8_t order[] = {
+    [O_TEM_VAR] = 0, [O_VARIABLE] = 1, [O_CONSTANT] = 2, [O_REFER] = 3, [O_DEREF] = 4
   };
 
   const Operand *op1 = *(Operand **) o1, *op2 = *(Operand **) o2;
@@ -29,9 +28,10 @@ int cmp_operand(const void *o1, const void *o2) {
   const int kind1 = op1->kind, kind2 = op2->kind;
 
   if (kind1 != kind2) return order[kind1] - order[kind2];
-  // todo also modify here
   if (kind1 == O_TEM_VAR) return op1->var_no - op2->var_no;
   if (kind1 == O_VARIABLE) return strcmp(op1->value_s, op2->value_s);
+  if (kind1 == O_CONSTANT) return op1->value - op2->value;
+  if (either(kind1, O_REFER, O_DEREF)) return cmp_operand(&op1->address, &op2->address);
   assert(false);
 #undef allowed_op
 }

@@ -9,7 +9,7 @@ typedef struct {
   use_info *use;
 } UseInfoTable;
 
-extern const u_int8_t operand_count_per_code[];
+extern const uint8_t operand_count_per_code[];
 int cmp_use_info(const void *u1, const void *u2);
 /* print code is only for debug purpose, so declare it as
  `extern` rather than add it in the header file. */
@@ -34,10 +34,10 @@ static void flipCondition(const Chunk *sentinel) {
     if (c->as.ternary.label.var_no != c2->as.unary.var_no) continue;
 
     const int len = 6;
-    const char *flipList[len] = {"==", "<", ">", "<=", ">=", "!="};
+    const char *flipList[] = {"==", "<", ">", "<=", ">=", "!="};
     char **relation = &c->as.ternary.relation;
     // search in flipList
-    const int index = findInArray(relation,false, flipList,
+    const int index = findInArray(relation, false, flipList,
                                   len, sizeof(char *), cmp_str);
     free(*relation); // maybe cause free after use warning.
     *relation = my_strdup(flipList[len - 1 - index]);
@@ -140,7 +140,7 @@ static UseInfoTable* createUseInfoTable(const BasicBlock *basic) {
     const int kind = code->kind;
     if (!in(kind, EFFECTIVE_CODE)) continue;
 
-    u_int8_t op_cnt = operand_count_per_code[kind];
+    uint8_t op_cnt = operand_count_per_code[kind];
     // the third operand for `C_IFGOTO` is label
     if (kind == C_IFGOTO) op_cnt--;
 
@@ -200,7 +200,7 @@ static void updateUseInfoTable(const Code *code, const UseInfoTable *table) {
   if (in(kind, 3, C_RETURN, C_WRITE, C_ARG) && result->kind == O_CONSTANT) return;
 
   int start_index = 0;
-  u_int8_t op_cnt = operand_count_per_code[kind];
+  uint8_t op_cnt = operand_count_per_code[kind];
   // Note: if kind is C_RETURN update it to be true
   if (kind == C_IFGOTO) {
     op_cnt--;
@@ -228,7 +228,7 @@ static void copyUseInfo(info *info, const Chunk *chunk, const UseInfoTable *tabl
   const int kind = chunk->code.kind;
   assert(in(kind, EFFECTIVE_CODE));
 
-  u_int8_t op_cnt = operand_count_per_code[kind];
+  uint8_t op_cnt = operand_count_per_code[kind];
   // the third operand for `C_IFGOTO` is label
   if (kind == C_IFGOTO) op_cnt--;
 
