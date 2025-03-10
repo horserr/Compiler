@@ -1,5 +1,47 @@
 # Summary
 
+test code sets: [this link](https://github.com/NijikaIjichi/nju-compiler-test)
+todo the file structure for this project
+
+## Project 4
+
+```asm
+# t5 := b - a
+  #++ 'ensureReg           '  (b) <-> $v0
+  #++ 'ensureReg           '  (a) <-> $v0
+  #++ 'seizeReg            '
+  #++ 'spillReg            '
+  #++ 'print_spill_absorb  '
+  sw   $v0, -16($fp)
+  #++ 'print_spill_absorb  '
+  lw   $v0, -12($fp)
+  #++ 'ensureReg           '  (t5) <-> $a0
+  #++ 'init_addr_descriptor'  OFFSET -56
+  addi $sp, $sp, -4
+  #++ 'seizeReg            '
+  #++ 'spillReg            '
+  #++ 'print_spill_absorb  '
+  sw   $a0, -24($fp)
+  sub  $a0, $v0, $v0
+```
+
+I used MARS(MIPS Assembler and Runtime Simulator)
+external tools setting up options
+
+adjust the sequence of arguments in Compiler.c
+
+Assumptions:
+- assume all variable will be saved in at most one register at any given time.
+- assume all variables will be saved before exiting the basic block
+
+counter.arg will be reset in caller every time function call returns from callee.
+
+learn to use:
+- `asprintf`
+- `qsort`, `bsearch`
+- generic custom function such as `reverseArray` in util.c
+- typeof
+
 ## Project 3
 
 Date: 29 Nov 2024
@@ -8,9 +50,7 @@ State: Finish all basic functionalities as well as the second option which is mu
 
 In the duration of writing code, I refer to [this repo](https://github.dev/Unkrible/Compilers/tree/master/Project3). Thanks Unkrible!
 
-Compared with the last project where I used a myriad of `malloc` to manually create data. This time, I make use of initializer powered by C itself. What is also highly recognizable is that I leverage a huge amount of macros which season the code to be more expressive, efficient as well as tasty:).
-
-There are still something to add, when it comes to optimization. However, time is limited and I know I'm about to stop here.
+Compared with the last project where I used a myriad of `malloc` to manually create data. This time, I made use of initializers and 'compound literals' powered by C itself. What is also highly recognizable is that I leveraged a huge amount of macros which season the code to be more expressive, efficient as well as tasty:).
 
 ## Project 2
 

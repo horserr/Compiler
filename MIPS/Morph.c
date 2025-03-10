@@ -135,7 +135,8 @@ static void adjustPtr(const char mode, const int offset) {
   assert(either(mode, EXPAND, SHRINK) && offset >= 0);
   const int o = mode * offset;
   frameOffset += o;
-  printAddImm("$sp", "$sp", o);
+  if (o != 0)
+    printAddImm("$sp", "$sp", o);
 }
 
 static void printLoadImm(const RegType reg, const int val) {
@@ -161,16 +162,6 @@ static void print_spill_absorb(const char T, const AddrDescriptor *ad) {
   print_save_load(T == 's' ? "sw" : "lw",
                   regsPool[ad->reg_index],
                   ad->offset, "$fp");
-}
-
-// helper function for `ensureReg` and `printInvoke`
-static void init_addr_descriptor(AddrDescriptor *ad) {
-  PRINT_INFO(NULL, " OFFSET %d", frameOffset - 4);
-  // must be uninitialized
-  assert(!is_addr_descriptor_valid(ad));
-  adjustPtr(EXPAND, ELEM_SIZE);
-  ad->offset = frameOffset;
-  assert(!is_in_reg(ad));
 }
 
 #define find_in_regs(reg) findInArray(&reg, false, regsPool, LEN, sizeof(RegType), cmp_str)
@@ -384,12 +375,9 @@ static RegType ensureReg(const Operand *op, const bool has_defined, const RegTyp
   PRINT_INFO(op, "");
   assert(op->kind != O_CONSTANT);
   AddrDescriptor *ad = getAddrDescriptor(op);
-
-  if (!is_addr_descriptor_valid(ad)) {
-    assert(!has_defined);
-    init_addr_descriptor(ad);
-  }
   // already saved on stack
+  assert(is_addr_descriptor_valid(ad));
+
 SEARCH:
   if (!is_in_reg(ad)) {
     ad->reg_index = seizeReg(avoidance);
@@ -430,19 +418,6 @@ static struct { // no more than 4
   uint8_t param;
 } counter;
 
-static void printFUNCTION(const Code *code) {
-  assert(code->kind == C_FUNCTION);
-  fprintf(f, "%s:\n", code->as.unary.value_s);
-
-  frameOffset = 0;
-  adjustPtr(EXPAND, 2 * ELEM_SIZE); // Offset.frameOffset will be changed to -4
-  print_save_load("sw", "$fp", 4, "$sp");
-  print_save_load("sw", "$ra", 0, "$sp");
-  printAddImm("$fp", "$sp", 2 * ELEM_SIZE);
-
-  counter.param = counter.arg = 0;
-}
-
 static void printPARAM(const Code *code) {
   assert(code->kind == C_PARAM);
   const Operand *receiver = &code->as.unary;
@@ -450,7 +425,7 @@ static void printPARAM(const Code *code) {
 
   AddrDescriptor *ad = getAddrDescriptor(receiver);
   if (counter.param < 4) { // allocate space on stack
-    init_addr_descriptor(ad);
+    assert(is_addr_descriptor_valid(ad));
 
     char courier[4];
     snprintf(courier, sizeof(courier), "$a%d", counter.param);
@@ -595,6 +570,9 @@ static void printRETURN(const Code *code) {
   assert(all_regs_empty());
   print_save_load("lw", "$ra", -2 * ELEM_SIZE, "$fp");
   print_save_load("lw", "$fp", -ELEM_SIZE, "$fp");
+
+  adjustPtr(SHRINK, -frameOffset);
+  assert(frameOffset == 0);
   printUnary("jr", "$ra");
 }
 
@@ -621,18 +599,6 @@ static void printInvoke(const Code *code) {
   // for now, all registers' value is in memory.
   printUnary("jal", invoke->value_s);
 
-  /* Allocate space on stack if result operand hasn't been initialized
-   * note:
-   *  The reason why I don't resort to ensureReg is that the later usage of
-   *    adoptReg forces the receiver operand mustn't have any registers attached to it.
-   *  In addition, it is also unnecessary to grab a register and then move
-   *    the return value to it.
-   */
-  AddrDescriptor *ad = getAddrDescriptor(result);
-  if (!is_addr_descriptor_valid(ad)) {
-    init_addr_descriptor(ad);
-  }
-
   /* note:
    *  use `adoptReg` rather than `printBinary("move", result_reg, "$v0");`,
        because the result operand will be refreshed anyway.
@@ -647,17 +613,11 @@ static void printInvoke(const Code *code) {
     adjustPtr(SHRINK, (counter.arg - 4) * ELEM_SIZE);
   counter.arg = 0; // reset arg counter
 }
-#undef ELEM_SIZE
 
 static void printREAD(const Code *code) {
   assert(code->kind == C_READ);
   const Operand *receiver = &code->as.unary;
 
-  /* same with `printInvoke` */
-  AddrDescriptor *ad = getAddrDescriptor(receiver);
-  if (!is_addr_descriptor_valid(ad)) {
-    init_addr_descriptor(ad);
-  }
   // note: read function promises only change $v0
   const RegType courier = "$v0";
   if (!is_reg_empty(courier)) spillReg(courier);
@@ -884,9 +844,7 @@ static void printGOTO(const Code *code) {
 static void printDEC(const Code *code) {
   assert(code->kind == C_DEC);
   const Operand *op = &code->as.dec.target;
-
   const RegType dec = ensureReg(op, false, NULL);
-  adjustPtr(EXPAND, (int) code->as.dec.size);
   printBinary("move", dec, "$sp");
   CHECK_FREE(0, op);
 }
@@ -894,13 +852,14 @@ static void printDEC(const Code *code) {
 static void print(const Code *code) {
 #define elem(T) [C_##T] = print##T
   const FuncPtr dispatch[] = {
-    elem(ASSIGN), elem(FUNCTION), elem(GOTO),
+    elem(ASSIGN), elem(GOTO),
     elem(LABEL), elem(RETURN), elem(DEC),
     elem(IFGOTO), elem(ARG), elem(PARAM),
     elem(READ), elem(WRITE),
     [C_ADD] = printArithmatic, [C_SUB] = printArithmatic,
     [C_MUL] = printArithmatic, [C_DIV] = printArithmatic,
   };
+  assert(code->kind != C_FUNCTION);
   dispatch[code->kind](code);
 #undef elem
 }
@@ -913,7 +872,7 @@ static void initialize(const Block *block, int current) {
   assert(current < block->cnt);
   // only redirect `variables` pointer for new function scope
   const BasicBlock *basic = block->container + current;
-  if (begin_kind(basic) != C_FUNCTION) return;
+  assert(begin_kind(basic) == C_FUNCTION);
 
   assert(variables == NULL && addr_descriptors == NULL);
   CNT = basic->cnt;
@@ -934,23 +893,63 @@ static void initialize(const Block *block, int current) {
 
   // initialize address descriptor
   addr_descriptors = malloc(sizeof(AddrDescriptor) * CNT);
-  memset(addr_descriptors, -1, sizeof(AddrDescriptor) * CNT);
 #undef size
 }
 
+static void printFUNCTION(const Block *block, const int index) {
+  // fixme track all array sizes
+  assert(index < block->cnt);
+  const Chunk *chunk = block->container[index].begin;
+  const Code *code = &chunk->code;
+  assert(code->kind == C_FUNCTION);
+  // initialize variables and address descriptor
+  initialize(block, index);
+
+  fprintf(f, "%s:\n", code->as.unary.value_s);
+
+  frameOffset = 0;
+  adjustPtr(EXPAND, 2 * ELEM_SIZE); // Offset.frameOffset will be changed to -4
+  print_save_load("sw", "$fp", 4, "$sp");
+  print_save_load("sw", "$ra", 0, "$sp");
+  printAddImm("$fp", "$sp", 2 * ELEM_SIZE);
+
+  assert(frameOffset == -8);
+  for (int i = 0; i < CNT; ++i) {
+    AddrDescriptor *ad = addr_descriptors + i;
+    ad->offset = frameOffset - (i + 1) * ELEM_SIZE;
+    ad->reg_index = -1;
+  }
+  adjustPtr(EXPAND, CNT * ELEM_SIZE);
+
+  // loop through code to allocate space for arrays
+  const Chunk *c = chunk->next;
+  while (c != chunk && c->code.kind != C_FUNCTION) {
+    const Code *code_ = &c->code;
+    if (code_->kind == C_DEC) {
+      const Operand *op = &code_->as.dec.target;
+      adjustPtr(EXPAND, code_->as.dec.size);
+      AddrDescriptor *ad = getAddrDescriptor(op);
+      ad->offset = frameOffset;
+      assert(ad->reg_index == -1);
+    }
+    c = c->next;
+  }
+  counter.param = counter.arg = 0;
+}
+#undef ELEM_SIZE
+
+// fixme rename or remove
+// and remove begin_kind
 static void finalize(const Block *block, const int current) {
+  assert(current < block->cnt);
   // after each basic block, all registers are empty.
   assert(all_regs_empty());
-  assert(current < block->cnt);
   if (current != block->cnt - 1) {
     const BasicBlock *next_basic = block->container + current + 1;
     if (begin_kind(next_basic) != C_FUNCTION) return;
   }
 
   assert(variables != NULL && addr_descriptors != NULL);
-  assert(all_regs_empty());
-  // all variables must have space on stack
-  assert(all_addr_descriptor_valid());
 #ifdef LOCAL
   fprintf(f, "# -- FINALIZE\n");
 #endif
@@ -959,9 +958,6 @@ static void finalize(const Block *block, const int current) {
   variables = NULL;
   free(addr_descriptors);
   addr_descriptors = NULL;
-
-  adjustPtr(SHRINK, -frameOffset);
-  assert(frameOffset == 0);
 }
 #undef begin_kind
 
@@ -982,8 +978,6 @@ void printMIPS(const char *file_name, const Block *blocks) {
   // loop through each basic block
   for (int i = 0; i < blocks->cnt; ++i) {
     const BasicBlock *basic = blocks->container + i;
-    // initialize variables and address descriptors
-    initialize(blocks, i);
     /* note: the length of 'info' array doesn't match
      *  the number of chunks in basic blocks.
      * So it is necessary to spare a variable to keep track of it. */
@@ -1003,7 +997,8 @@ void printMIPS(const char *file_name, const Block *blocks) {
         // only increment the 'info_index' if it is effective code.
         USE_INFO = (basic->info + info_index++)->use;
       }
-      print(code);
+      if (kind == C_FUNCTION) printFUNCTION(blocks, i);
+      else print(code);
       chunk = chunk->next;
     }
     finalize(blocks, i);
